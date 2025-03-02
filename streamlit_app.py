@@ -19,6 +19,7 @@ def load_yolo_model(model_path):
 
 # Train the classification model
 def train_model(uploaded_files):
+    progress_bar = st.progress(0)  # Add progress bar
     images, labels = [], []
     label_map = {}
     
@@ -47,7 +48,9 @@ def train_model(uploaded_files):
     ])
     
     model.compile(optimizer='adam', loss='binary_crossentropy' if len(label_map) == 1 else 'categorical_crossentropy', metrics=['accuracy'])
-    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2)
+    for epoch in range(10):
+        model.fit(images, labels, epochs=1, batch_size=8, validation_split=0.2, verbose=0)
+        progress_bar.progress((epoch + 1) / 10)  # Update progress bar
     return model, label_map
 
 # Train YOLO model on uploaded images
