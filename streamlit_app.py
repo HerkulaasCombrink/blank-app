@@ -50,7 +50,7 @@ if st.button("Show 3D Hello Sign"):
     for i in range(20):  # Animate the waving motion
         angle = 0.3 * np.sin(i * np.pi / 5)
         create_hand(ax, angle)
-        st.pyplot(fig)
-        time.sleep(0.1)
+    
+    st.pyplot(fig)  # Show the final frame in one view
 
 st.write("This 3D avatar represents a waving hand for the 'Hello' sign.")
