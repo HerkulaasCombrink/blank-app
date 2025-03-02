@@ -1,7 +1,8 @@
 streamlit
 numpy
+plotly
+matplotlib
 imageio
 Pillow
+tensorflow
 mediapipe
-moviepy
-
