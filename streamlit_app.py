@@ -4,7 +4,6 @@ import zipfile
 import cv2
 import numpy as np
 import tempfile
-from moviepy.editor import VideoFileClip
 from albumentations import Compose, RandomBrightnessContrast, ShiftScaleRotate, Blur
 
 # Define augmentation pipeline for images
@@ -23,18 +22,33 @@ def generate_synthetic_images(uploaded_file):
     synthetic_images = [augment_image(image) for _ in range(10)]
     return synthetic_images
 
-# Process videos
+# Process videos using OpenCV instead of moviepy
 def generate_synthetic_videos(uploaded_file):
     temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
     temp_video.write(uploaded_file.read())
-    clip = VideoFileClip(temp_video.name)
+    temp_video.close()
+    cap = cv2.VideoCapture(temp_video.name)
+    
     output_files = []
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     for i in range(10):
         output_path = f"synthetic_video_{i}.mp4"
-        clip.write_videofile(output_path, codec='libx264', audio=False)
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            out.write(frame)
+        
+        out.release()
         output_files.append(output_path)
     
+    cap.release()
     return output_files
 
 # Create ZIP archive
