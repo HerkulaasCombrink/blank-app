@@ -3,5 +3,7 @@ opencv-python-headless
 numpy
 tensorflow==2.12.0
 pillow
+scikit-learn
+matplotlib
 pickle-mixin
 protobuf==3.20.*
