@@ -8,6 +8,7 @@ import pandas as pd
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
 from PIL import Image
 
@@ -37,10 +38,22 @@ def load_model(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
+# Data augmentation for training images
+def augment_image(image):
+    datagen = ImageDataGenerator(
+        rotation_range=20,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        brightness_range=[0.8, 1.2],
+        horizontal_flip=True
+    )
+    image = np.expand_dims(image, axis=0)
+    return datagen.flow(image, batch_size=1)[0][0]
+
 # Train model
 def train_model(uploaded_files):
     images, labels = [], []
-    label_map = {}
+    label_map = {'No Sign': 0}  # Include 'No Sign' class
     
     for uploaded_file in uploaded_files:
         label = uploaded_file.name.split('_')[0]  # Assuming label is in filename
@@ -50,12 +63,15 @@ def train_model(uploaded_files):
         image = np.array(Image.open(uploaded_file).convert('RGB'))
         roi = extract_roi(image)
         if roi is not None:
-            images.append(roi)
-            labels.append(label_map[label])
+            augmented_images = [roi] + [augment_image(roi) for _ in range(5)]  # Augment data
+            images.extend(augmented_images)
+            labels.extend([label_map[label]] * len(augmented_images))
     
-    if not images:
-        st.error("No valid bounding boxes detected in the images.")
-        return None, None
+    # Add blank images for 'No Sign' class
+    for _ in range(len(images) // len(label_map)):
+        blank_image = np.zeros((64, 64, 3))
+        images.append(blank_image)
+        labels.append(label_map['No Sign'])
     
     images = np.array(images)
     labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
@@ -70,35 +86,7 @@ def train_model(uploaded_files):
     model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2, callbacks=[TrainingCallback()])
     return model, label_map
 
-# Automatically detect red bounding boxes
-def detect_red_bounding_box(image):
-    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    lower_red1 = np.array([0, 120, 70])
-    upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([170, 120, 70])
-    upper_red2 = np.array([180, 255, 255])
-    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask = mask1 + mask2
-    
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:
-        largest_contour = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(largest_contour)
-        return (x, y, x + w, y + h)
-    return None
-
-# Extract region of interest (ROI) from image
-def extract_roi(image):
-    bbox = detect_red_bounding_box(image)
-    if bbox:
-        x1, y1, x2, y2 = bbox
-        roi = image[y1:y2, x1:x2]
-        roi_resized = cv2.resize(roi, (64, 64)) / 255.0
-        return roi_resized
-    return None
-
-# Process video and detect signs using automatically detected bounding boxes
+# Process video and detect signs
 def process_video(video_file, model, label_map):
     cap = cv2.VideoCapture(video_file)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -118,8 +106,9 @@ def process_video(video_file, model, label_map):
                 frame_array = np.expand_dims(roi, axis=0)
                 prediction = model.predict(frame_array)
                 predicted_index = np.argmax(prediction)
+                confidence = prediction[0][predicted_index]
                 
-                if prediction[0][predicted_index] >= 0.7:  # Confidence threshold
+                if confidence >= 0.7:
                     predicted_label = list(label_map.keys())[predicted_index]
                 else:
                     predicted_label = "Not Detected"
