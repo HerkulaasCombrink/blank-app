@@ -8,7 +8,7 @@ from PIL import Image
 import tempfile
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-import mediapipe as mp
+import mediapipe.python.solutions as mp_solutions
 import tensorflow as tf
 
 # Load pre-trained AI model for SASL classification
