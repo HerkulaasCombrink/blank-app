@@ -4,6 +4,7 @@ import numpy as np
 import os
 import pickle
 import tensorflow as tf
+import pandas as pd
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -65,9 +66,35 @@ def load_model(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
+# Process video and detect signs
+def process_video(video_file, model, label_map):
+    cap = cv2.VideoCapture(video_file)
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    detected_signs = []
+    
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        if frame_count % fps == 0:  # Process 1 frame per second
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_resized = cv2.resize(frame_rgb, (64, 64))
+            frame_array = img_to_array(frame_resized) / 255.0
+            frame_array = np.expand_dims(frame_array, axis=0)
+            prediction = model.predict(frame_array)
+            predicted_label = list(label_map.keys())[np.argmax(prediction)]
+            detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
+        
+        frame_count += 1
+    
+    cap.release()
+    return pd.DataFrame(detected_signs)
+
 # Streamlit app
 st.title("Sign Language Recognition")
-option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Detect Sign Using Webcam"])
+option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Process Video"])
 
 if option == "Train Model":
     uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
@@ -78,38 +105,25 @@ if option == "Train Model":
         with open(model_filename, "rb") as f:
             st.download_button("Download Model", f, file_name=model_filename)
 
-elif option == "Upload Pickle File and Detect Sign Using Webcam":
+elif option == "Upload Pickle File and Process Video":
     uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
-    if uploaded_pkl:
+    uploaded_video = st.file_uploader("Upload Video File", type=["mp4"])
+    
+    if uploaded_pkl and uploaded_video:
         with open("temp_model.pkl", "wb") as f:
             f.write(uploaded_pkl.getbuffer())
         model, label_map = load_model("temp_model.pkl")
         st.success("Model loaded successfully!")
         
-        st.write("Webcam Stream (Press 'Start' to detect signs)")
-        run = st.checkbox("Start Webcam")
+        with open("temp_video.mp4", "wb") as f:
+            f.write(uploaded_video.getbuffer())
         
-        if run:
-            cap = cv2.VideoCapture(0)
-            stframe = st.empty()
-            
-            if not cap.isOpened():
-                st.error("Failed to access webcam. Ensure your camera is connected and not being used by another application.")
-            else:
-                while run:
-                    ret, frame = cap.read()
-                    if not ret:
-                        st.error("Webcam capture failed.")
-                        break
-                    
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    frame_resized = cv2.resize(frame_rgb, (64, 64))
-                    frame_array = img_to_array(frame_resized) / 255.0
-                    frame_array = np.expand_dims(frame_array, axis=0)
-                    prediction = model.predict(frame_array)
-                    predicted_label = list(label_map.keys())[np.argmax(prediction)]
-                    
-                    cv2.putText(frame_rgb, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    stframe.image(frame_rgb, channels="RGB")
-                
-                cap.release()
+        st.success("Video uploaded successfully! Processing...")
+        results_df = process_video("temp_video.mp4", model, label_map)
+        
+        st.write("Detected Signs in Video:")
+        st.dataframe(results_df)
+        
+        csv_filename = "detected_signs.csv"
+        results_df.to_csv(csv_filename, index=False)
+        st.download_button("Download CSV", data=open(csv_filename, "rb").read(), file_name=csv_filename)
