@@ -78,41 +78,40 @@ def augment_image(image):
     image = np.expand_dims(image, axis=0)
     return datagen.flow(image, batch_size=1)[0][0]
 
-# Train model
-def train_model(uploaded_files):
-    images, labels = [], []
-    label_map = {'No Sign': 0}  # Include 'No Sign' class
-    
-    for uploaded_file in uploaded_files:
-        label = uploaded_file.name.split('_')[0]  # Assuming label is in filename
-        if label not in label_map:
-            label_map[label] = len(label_map)
-        
-        image = np.array(Image.open(uploaded_file).convert('RGB'))
-        roi = extract_roi(image)
-        if roi is not None:
-            augmented_images = [roi] + [augment_image(roi) for _ in range(5)]  # Augment data
-            images.extend(augmented_images)
-            labels.extend([label_map[label]] * len(augmented_images))
-    
-    # Add blank images for 'No Sign' class
-    for _ in range(len(images) // len(label_map)):
-        blank_image = np.zeros((64, 64, 3))
-        images.append(blank_image)
-        labels.append(label_map['No Sign'])
-    
-    images = np.array(images)
-    labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
-    
-    model = create_model(num_classes=len(label_map))
-    
+# Process video and detect signs
+def process_video(video_file, model, label_map):
+    cap = cv2.VideoCapture(video_file)
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    detected_signs = []
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     progress_bar = st.progress(0)
-    class TrainingCallback(tf.keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            progress_bar.progress((epoch + 1) / 10)
     
-    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2, callbacks=[TrainingCallback()])
-    return model, label_map
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        if frame_count % fps == 0:  # Process 1 frame per second
+            roi = extract_roi(frame)
+            if roi is not None:
+                frame_array = np.expand_dims(roi, axis=0)
+                prediction = model.predict(frame_array)
+                predicted_index = np.argmax(prediction)
+                confidence = prediction[0][predicted_index]
+                
+                if confidence >= 0.7:
+                    predicted_label = list(label_map.keys())[predicted_index]
+                else:
+                    predicted_label = "Not Detected"
+                
+                detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
+        
+        frame_count += 1
+        progress_bar.progress(frame_count / total_frames)
+    
+    cap.release()
+    return pd.DataFrame(detected_signs)
 
 # Streamlit App
 def main():
@@ -155,4 +154,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- 
