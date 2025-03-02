@@ -62,7 +62,6 @@ num_images = st.slider("Number of Synthetic Images", min_value=1, max_value=20, 
 
 if uploaded_file:
     image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
-    st.image(image, caption="Original Image", use_column_width=True)
     
     # Layout adjustment: Face controls on the right, Hand controls on the left
     col1, col2 = st.columns(2)
