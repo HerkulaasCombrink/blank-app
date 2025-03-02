@@ -10,10 +10,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropou
 from io import BytesIO
 from PIL import Image
 import torch
-import torchvision.transforms as transforms
-from torchvision import models
-
-# Load YOLO model
+import yaml
 from ultralytics import YOLO
 
 # Load pre-trained YOLO model for object detection
@@ -55,61 +52,36 @@ def train_model(uploaded_files):
 
 # Train YOLO model on uploaded images
 def train_yolo(uploaded_files):
-    yolo_model = YOLO("yolov8n.pt")  # Load YOLOv8 base model
     data_dir = "yolo_training_data"
     os.makedirs(data_dir, exist_ok=True)
+    images_dir = os.path.join(data_dir, "images")
+    labels_dir = os.path.join(data_dir, "labels")
+    os.makedirs(images_dir, exist_ok=True)
+    os.makedirs(labels_dir, exist_ok=True)
     
     for uploaded_file in uploaded_files:
-        file_path = os.path.join(data_dir, uploaded_file.name)
+        file_path = os.path.join(images_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
+        
+        label_file = file_path.replace(".jpg", ".txt").replace(".jpeg", ".txt")
+        with open(label_file, "w") as f:
+            f.write("0 0.5 0.5 1.0 1.0\n")  # Placeholder for YOLO bounding box format
     
-    yolo_model.train(data=data_dir, epochs=10, imgsz=640)
+    # Create YOLO `data.yaml`
+    data_yaml = {
+        "train": images_dir,
+        "val": images_dir,
+        "nc": 1,
+        "names": ["sign"]
+    }
+    with open(os.path.join(data_dir, "data.yaml"), "w") as f:
+        yaml.dump(data_yaml, f)
+    
+    # Train YOLO model
+    yolo_model = YOLO("yolov8n.pt")
+    yolo_model.train(data=os.path.join(data_dir, "data.yaml"), epochs=10, imgsz=640)
     return "runs/train/exp/weights/best.pt"
-
-# Process video and detect trained sign patterns
-def process_video(video_file, model, label_map, yolo_model):
-    cap = cv2.VideoCapture(video_file)
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frame_interval = 5  # Process every 5th frame
-    detected_signs = []
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    progress_bar = st.progress(0)
-    
-    frame_count = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        if frame_count % frame_interval == 0:
-            detections = yolo_model(frame)
-            
-            for detection in detections:
-                x1, y1, x2, y2, conf, cls = detection.xyxy[0].cpu().numpy()
-                if conf < 0.7:
-                    continue
-                
-                roi = frame[int(y1):int(y2), int(x1):int(x2)]
-                roi_resized = cv2.resize(roi, (64, 64)) / 255.0
-                frame_array = np.expand_dims(roi_resized, axis=0)
-                
-                prediction = model.predict(frame_array)
-                predicted_index = np.argmax(prediction)
-                confidence = prediction[0][predicted_index]
-                
-                if confidence >= 0.7:
-                    predicted_label = list(label_map.keys())[predicted_index]
-                else:
-                    predicted_label = "Not Detected"
-                
-                detected_signs.append({"Timestamp (s)": frame_count // fps, "Detected Sign": predicted_label, "Confidence": confidence})
-        
-        frame_count += 1
-        progress_bar.progress(frame_count / total_frames)
-    
-    cap.release()
-    return pd.DataFrame(detected_signs)
 
 # Streamlit App
 def main():
@@ -162,4 +134,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- 
