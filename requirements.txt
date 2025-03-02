@@ -5,3 +5,4 @@ tensorflow
 pillow
 pickle-mixin
 protobuf
+pyqt5
