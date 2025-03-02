@@ -90,21 +90,26 @@ elif option == "Upload Pickle File and Detect Sign Using Webcam":
         run = st.checkbox("Start Webcam")
         
         if run:
-            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # Ensuring DirectShow backend is used
+            cap = cv2.VideoCapture(0)
             stframe = st.empty()
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Failed to access webcam. Make sure it is connected and accessible.")
-                    break
+            
+            if not cap.isOpened():
+                st.error("Failed to access webcam. Ensure your camera is connected and not being used by another application.")
+            else:
+                while run:
+                    ret, frame = cap.read()
+                    if not ret:
+                        st.error("Webcam capture failed.")
+                        break
+                    
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame_resized = cv2.resize(frame_rgb, (64, 64))
+                    frame_array = img_to_array(frame_resized) / 255.0
+                    frame_array = np.expand_dims(frame_array, axis=0)
+                    prediction = model.predict(frame_array)
+                    predicted_label = list(label_map.keys())[np.argmax(prediction)]
+                    
+                    cv2.putText(frame_rgb, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    stframe.image(frame_rgb, channels="RGB")
                 
-                frame_resized = cv2.resize(frame, (64, 64))
-                frame_array = img_to_array(frame_resized) / 255.0
-                frame_array = np.expand_dims(frame_array, axis=0)
-                prediction = model.predict(frame_array)
-                predicted_label = list(label_map.keys())[np.argmax(prediction)]
-                
-                cv2.putText(frame, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                stframe.image(frame, channels="BGR")
-            cap.release()
-            cv2.destroyAllWindows()
+                cap.release()
