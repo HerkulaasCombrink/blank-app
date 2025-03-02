@@ -1,52 +1,36 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import open3d as o3d
+import numpy as np
 
-# HTML & JavaScript for a 3D Hand Animation using Three.js
-threejs_code = """
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <style>
-        body { margin: 0; }
-        canvas { display: block; }
-    </style>
-</head>
-<body>
-    <script>
-        // Create Scene
-        var scene = new THREE.Scene();
-        var camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        var renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+# Function to create a basic 3D hand model (cube as a simple hand)
+def create_hand():
+    hand = o3d.geometry.TriangleMesh.create_box(width=0.3, height=0.6, depth=0.1)
+    hand.compute_vertex_normals()
+    hand.paint_uniform_color([1, 0.8, 0])  # Yellow color
+    return hand
 
-        // Create Hand (Simple Cube for demo)
-        var geometry = new THREE.BoxGeometry(1, 2, 0.5);
-        var material = new THREE.MeshBasicMaterial({color: 0xffcc00});
-        var hand = new THREE.Mesh(geometry, material);
-        scene.add(hand);
+# Function to create an animation of waving
+def animate_wave():
+    hand = create_hand()
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
 
-        camera.position.z = 5;
+    vis.add_geometry(hand)
+    
+    for i in range(30):  # Loop to create a waving motion
+        angle = 0.2 * np.sin(i * np.pi / 10)  # Oscillating wave motion
+        hand.rotate(angle, center=(0, 0, 0))  # Rotate around the center
+        vis.update_geometry(hand)
+        vis.poll_events()
+        vis.update_renderer()
 
-        function animate() {
-            requestAnimationFrame(animate);
-            hand.rotation.x += 0.05;
-            hand.rotation.y += 0.05;
-            renderer.render(scene, camera);
-        }
-
-        animate();
-    </script>
-</body>
-</html>
-"""
+    vis.destroy_window()
 
 # Streamlit UI
-st.title("South African Sign Language (SASL) - 3D Avatar Signing 'Hello'")
+st.title("SASL 3D Avatar - Signing 'Hello'")
 
-# Embed Three.js animation inside Streamlit
-components.html(threejs_code, height=500)
+if st.button("Show 3D Hello Sign"):
+    animate_wave()
+    st.write("3D hand waving animation displayed!")
 
-st.write("This 3D avatar represents a waving hand as the 'Hello' sign.")
+st.write("This 3D avatar represents a waving hand for the 'Hello' sign.")
