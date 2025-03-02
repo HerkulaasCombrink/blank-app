@@ -1,8 +1,7 @@
 streamlit
 numpy
-plotly
-matplotlib
 imageio
 Pillow
 mediapipe
 moviepy
+
