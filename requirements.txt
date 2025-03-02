@@ -2,7 +2,10 @@ streamlit
 opencv-python-headless
 numpy
 tensorflow==2.12.0
-pillow
+torch
+torchvision
+ultralytics
+Pillow
 scikit-learn
 matplotlib
 pickle-mixin
