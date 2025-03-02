@@ -38,12 +38,12 @@ def load_model(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
-# Automatically detect red bounding boxes
+# Improve red bounding box detection
 def detect_red_bounding_box(image):
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    lower_red1 = np.array([0, 120, 70])
+    lower_red1 = np.array([0, 150, 50])  # Adjusted threshold
     upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([170, 120, 70])
+    lower_red2 = np.array([170, 150, 50])
     upper_red2 = np.array([180, 255, 255])
     mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
     mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
@@ -52,8 +52,9 @@ def detect_red_bounding_box(image):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if contours:
         largest_contour = max(contours, key=cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(largest_contour)
-        return (x, y, x + w, y + h)
+        if cv2.contourArea(largest_contour) > 500:  # Ensure bounding box is valid
+            x, y, w, h = cv2.boundingRect(largest_contour)
+            return (x, y, x + w, y + h)
     return None
 
 # Extract region of interest (ROI) from image
@@ -100,12 +101,14 @@ def process_video(video_file, model, label_map):
                 predicted_index = np.argmax(prediction)
                 confidence = prediction[0][predicted_index]
                 
-                if confidence >= 0.7:
+                if confidence >= 0.85:  # Increased threshold
                     predicted_label = list(label_map.keys())[predicted_index]
                 else:
                     predicted_label = "Not Detected"
                 
                 detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
+        else:
+            detected_signs.append({"Second": frame_count // fps, "Detected Sign": "No Sign Detected"})
         
         frame_count += 1
         progress_bar.progress(frame_count / total_frames)
