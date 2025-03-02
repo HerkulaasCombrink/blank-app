@@ -5,9 +5,9 @@ import cv2
 import numpy as np
 import tempfile
 import json
-from albumentations import Compose, RandomBrightnessContrast, ShiftScaleRotate, Blur, ElasticTransform, GridDistortion, OpticalDistortion
+from albumentations import Compose, RandomBrightnessContrast, ShiftScaleRotate, Blur, ElasticTransform, GridDistortion, OpticalDistortion, HueSaturationValue
 
-# Define augmentation pipeline for diverse transformations
+# Define augmentation pipeline for diverse transformations with color and face distortions
 def augment_image(image):
     augmentations = Compose([
         RandomBrightnessContrast(p=0.5),
@@ -15,7 +15,8 @@ def augment_image(image):
         Blur(blur_limit=5, p=0.5),
         ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.7),
         GridDistortion(num_steps=5, distort_limit=0.3, p=0.6),
-        OpticalDistortion(distort_limit=0.3, shift_limit=0.3, p=0.6)
+        OpticalDistortion(distort_limit=0.3, shift_limit=0.3, p=0.6),
+        HueSaturationValue(hue_shift_limit=30, sat_shift_limit=50, val_shift_limit=50, p=0.7)  # Color variation
     ])
     augmented = augmentations(image=image)
     return augmented['image']
@@ -31,6 +32,12 @@ def overlay_label(image, label):
     text_y = image.shape[0] - 20
     cv2.putText(overlay, label, (text_x, text_y), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
     return overlay
+
+# Annotate synthetic images
+def annotate_image(image):
+    st.image(image, caption="Synthetic Image for Annotation", use_column_width=True)
+    annotation = st.text_input("Enter annotation for this image")
+    return annotation
 
 # Process images with adjustable number of synthetic samples
 def generate_synthetic_images(uploaded_file, label, num_images):
@@ -63,10 +70,11 @@ if uploaded_file and label:
         metadata = {"label": label, "images": []}
         
         for i, img in enumerate(synthetic_images):
+            annotation = annotate_image(img)
             img_path = f"synthetic_image_{i}.jpg"
             cv2.imwrite(img_path, img)
             image_files.append(img_path)
-            metadata["images"].append({"file": img_path, "label": label})
+            metadata["images"].append({"file": img_path, "label": label, "annotation": annotation})
             st.image(img, caption=f"Synthetic Image {i+1}", use_column_width=True)
         
         zip_name = "synthetic_images.zip"
