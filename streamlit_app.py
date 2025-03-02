@@ -26,28 +26,53 @@ def create_model(num_classes):
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
-# Extract region of interest (ROI) from image
-def extract_roi(image, bbox):
-    x1, y1, x2, y2 = bbox
-    roi = image[y1:y2, x1:x2]
-    roi_resized = cv2.resize(roi, (64, 64)) / 255.0
-    return roi_resized
+# Automatically detect red bounding boxes
+def detect_red_bounding_box(image):
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    lower_red1 = np.array([0, 120, 70])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 120, 70])
+    upper_red2 = np.array([180, 255, 255])
+    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask = mask1 + mask2
+    
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        largest_contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(largest_contour)
+        return (x, y, x + w, y + h)
+    return None
 
-# Train model with progress bar using ROIs only
-def train_model(uploaded_files, bboxes):
+# Extract region of interest (ROI) from image
+def extract_roi(image):
+    bbox = detect_red_bounding_box(image)
+    if bbox:
+        x1, y1, x2, y2 = bbox
+        roi = image[y1:y2, x1:x2]
+        roi_resized = cv2.resize(roi, (64, 64)) / 255.0
+        return roi_resized
+    return None
+
+# Train model with progress bar using automatically detected ROIs
+def train_model(uploaded_files):
     images, labels = [], []
     label_map = {}
     
-    for uploaded_file, bbox in zip(uploaded_files, bboxes):
+    for uploaded_file in uploaded_files:
         label = uploaded_file.name.split('_')[0]  # Assuming label is in filename
         if label not in label_map:
             label_map[label] = len(label_map)
         
         image = np.array(Image.open(uploaded_file).convert('RGB'))
-        roi = extract_roi(image, bbox)
-        
-        images.append(roi)
-        labels.append(label_map[label])
+        roi = extract_roi(image)
+        if roi is not None:
+            images.append(roi)
+            labels.append(label_map[label])
+    
+    if not images:
+        st.error("No valid bounding boxes detected in the images.")
+        return None, None
     
     images = np.array(images)
     labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
@@ -73,8 +98,8 @@ def load_model(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
-# Process video and detect signs using ROIs
-def process_video(video_file, model, label_map, bbox):
+# Process video and detect signs using automatically detected bounding boxes
+def process_video(video_file, model, label_map):
     cap = cv2.VideoCapture(video_file)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     detected_signs = []
@@ -86,11 +111,12 @@ def process_video(video_file, model, label_map, bbox):
             break
         
         if frame_count % fps == 0:  # Process 1 frame per second
-            roi = extract_roi(frame, bbox)
-            frame_array = np.expand_dims(roi, axis=0)
-            prediction = model.predict(frame_array)
-            predicted_label = list(label_map.keys())[np.argmax(prediction)]
-            detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
+            roi = extract_roi(frame)
+            if roi is not None:
+                frame_array = np.expand_dims(roi, axis=0)
+                prediction = model.predict(frame_array)
+                predicted_label = list(label_map.keys())[np.argmax(prediction)]
+                detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
         
         frame_count += 1
     
@@ -103,21 +129,13 @@ option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and P
 
 if option == "Train Model":
     uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
-    st.write("Define Bounding Boxes (x1, y1, x2, y2) for Each Image:")
-    bboxes = []
-    for i in range(len(uploaded_files)):
-        x1 = st.number_input(f"X1 for Image {i+1}", min_value=0, value=10)
-        y1 = st.number_input(f"Y1 for Image {i+1}", min_value=0, value=10)
-        x2 = st.number_input(f"X2 for Image {i+1}", min_value=0, value=50)
-        y2 = st.number_input(f"Y2 for Image {i+1}", min_value=0, value=50)
-        bboxes.append((x1, y1, x2, y2))
-    
     if st.button("Train Model") and uploaded_files:
-        model, label_map = train_model(uploaded_files, bboxes)
-        model_filename = save_model(model, label_map)
-        st.success("Model trained and saved successfully!")
-        with open(model_filename, "rb") as f:
-            st.download_button("Download Model", f, file_name=model_filename)
+        model, label_map = train_model(uploaded_files)
+        if model:
+            model_filename = save_model(model, label_map)
+            st.success("Model trained and saved successfully!")
+            with open(model_filename, "rb") as f:
+                st.download_button("Download Model", f, file_name=model_filename)
 
 elif option == "Upload Pickle File and Process Video":
     uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
@@ -129,19 +147,12 @@ elif option == "Upload Pickle File and Process Video":
         model, label_map = load_model("temp_model.pkl")
         st.success("Model loaded successfully!")
         
-        st.write("Define Bounding Box (x1, y1, x2, y2) for Sign Detection:")
-        x1 = st.number_input("X1", min_value=0, value=10)
-        y1 = st.number_input("Y1", min_value=0, value=10)
-        x2 = st.number_input("X2", min_value=0, value=50)
-        y2 = st.number_input("Y2", min_value=0, value=50)
-        bbox = (x1, y1, x2, y2)
-        
         if st.button("Process Video"):
             with open("temp_video.mp4", "wb") as f:
                 f.write(uploaded_video.getbuffer())
             
             st.success("Video uploaded successfully! Processing...")
-            results_df = process_video("temp_video.mp4", model, label_map, bbox)
+            results_df = process_video("temp_video.mp4", model, label_map)
             
             st.write("Detected Signs in Video:")
             st.dataframe(results_df)
