@@ -2,5 +2,3 @@ streamlit
 opencv-python-headless
 numpy
 albumentations
-moviepy
-imageio[ffmpeg]  # Add this to fix missing ffmpeg dependencies
