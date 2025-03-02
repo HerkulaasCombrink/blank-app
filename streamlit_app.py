@@ -1,70 +1,72 @@
 import streamlit as st
-import numpy as np
-import plotly.graph_objects as go
-import time
-import imageio
-import io
-from PIL import Image
 import tempfile
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import numpy as np
+import moviepy.editor as mp
+import imageio
+import mediapipe as mp_hands
+from PIL import Image
+import io
 
-# Function to create a simple 3D hand using Matplotlib
-def create_hand(angle):
-    palm_x = [-0.2, 0.2, 0.2, -0.2, -0.2]
-    palm_y = [0, 0, 0.4, 0.4, 0]
-    palm_z = [1, 1, 1, 1, 1]
+# Initialize MediaPipe Hands
+mp_hands_module = mp_hands.solutions.hands
+mp_drawing = mp_hands.solutions.drawing_utils
 
-    fingers = [
-        ([-0.15, -0.15], [0.4, 0.6], [1, 1]),
-        ([-0.05, -0.05], [0.4, 0.7], [1, 1]),
-        ([0.05, 0.05], [0.4, 0.75], [1, 1]),
-        ([0.15, 0.15], [0.4, 0.65], [1, 1])
-    ]
-    
-    # Rotate hand slightly
-    rotated_y = np.cos(angle) * np.array(palm_y) - np.sin(angle) * np.array(palm_z)
-    rotated_z = np.sin(angle) * np.array(palm_y) + np.cos(angle) * np.array(palm_z)
-    
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw={'projection': '3d'})
-    ax.plot(palm_x, rotated_y, rotated_z, color='orange', linewidth=3)
-    
-    for finger in fingers:
-        finger_y = np.cos(angle) * np.array(finger[1]) - np.sin(angle) * np.array(finger[2])
-        finger_z = np.sin(angle) * np.array(finger[1]) + np.cos(angle) * np.array(finger[2])
-        ax.plot(finger[0], finger_y, finger_z, color='brown', linewidth=2)
-    
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_zticks([])
-    ax.set_title("SASL 'Hello' Sign")
-    
-    return fig
+# Function to process video without OpenCV
+def process_video(video_path):
+    clip = mp.VideoFileClip(video_path)
+    hands = mp_hands_module.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 
-# Generate a looping GIF of the animation using Matplotlib
-def generate_gif():
+    translations = []
     frames = []
-    for i in range(20):  # Animate the waving motion
-        angle = 0.3 * np.sin(i * np.pi / 5)
-        fig = create_hand(angle)
-        
-        canvas = FigureCanvas(fig)
-        buf = io.BytesIO()
-        canvas.print_png(buf)
-        img = Image.open(buf)
-        frames.append(img)
-        plt.close(fig)
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as tmpfile:
-        imageio.mimsave(tmpfile.name, frames, duration=0.1, loop=0)  # Loop the GIF indefinitely
-        return tmpfile.name
+
+    for frame in clip.iter_frames(fps=10, dtype="uint8"):
+        image = Image.fromarray(frame)  # Convert frame to PIL image
+        frame_rgb = np.array(image)  # Convert to RGB format
+
+        # Process frame with MediaPipe
+        results = hands.process(frame_rgb)
+
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                mp_drawing.draw_landmarks(frame_rgb, hand_landmarks, mp_hands_module.HAND_CONNECTIONS)
+            translations.append("Detected SASL Gesture")  # Placeholder for real translation
+
+        frames.append(frame_rgb)
+
+    return frames, translations
+
+# Function to save processed video
+def save_processed_video(frames, original_video_path):
+    clip = mp.VideoFileClip(original_video_path)
+    output_path = "processed_video.mp4"
+    video_writer = imageio.get_writer(output_path, fps=10)
+
+    for frame in frames:
+        video_writer.append_data(frame)
+
+    video_writer.close()
+    return output_path
 
 # Streamlit UI
-st.title("SASL 3D Avatar - Signing 'Hello'")
+st.title("SASL Video Translation Without OpenCV")
 
-if st.button("Generate & Show GIF"):
-    gif_path = generate_gif()
-    st.image(gif_path)
-    st.download_button(label="Download GIF", data=open(gif_path, "rb").read(), file_name="hello_sign.gif", mime="image/gif")
+uploaded_file = st.file_uploader("Upload a video file", type=["mp4", "avi", "mov"])
 
-st.write("This 3D avatar represents a waving hand for the 'Hello' sign.")
+if uploaded_file:
+    with tempfile.NamedTemporaryFile(delete=False) as temp_video:
+        temp_video.write(uploaded_file.read())
+        video_path = temp_video.name
+
+    st.video(video_path)
+
+    if st.button("Process Video"):
+        with st.spinner("Processing video..."):
+            frames, translations = process_video(video_path)
+            processed_video_path = save_processed_video(frames, video_path)
+
+        st.success("Video processed successfully!")
+        st.video(processed_video_path)
+
+        st.subheader("Translation:")
+        for i, translation in enumerate(translations):
+            st.write(f"Frame {i}: {translation}")
