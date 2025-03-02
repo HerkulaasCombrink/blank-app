@@ -52,35 +52,36 @@ def train_model(uploaded_files):
 
 # Train YOLO model on uploaded images
 def train_yolo(uploaded_files):
-    data_dir = "yolo_training_data"
-    os.makedirs(data_dir, exist_ok=True)
-    images_dir = os.path.join(data_dir, "images")
-    labels_dir = os.path.join(data_dir, "labels")
+    base_dir = "yolo_training_data"
+    images_dir = os.path.join(base_dir, "images")
+    labels_dir = os.path.join(base_dir, "labels")
     os.makedirs(images_dir, exist_ok=True)
     os.makedirs(labels_dir, exist_ok=True)
     
+    # Ensure dataset structure
     for uploaded_file in uploaded_files:
         file_path = os.path.join(images_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
-        label_file = file_path.replace(".jpg", ".txt").replace(".jpeg", ".txt")
+        label_file = os.path.join(labels_dir, uploaded_file.name.replace(".jpg", ".txt").replace(".jpeg", ".txt"))
         with open(label_file, "w") as f:
             f.write("0 0.5 0.5 1.0 1.0\n")  # Placeholder for YOLO bounding box format
     
     # Create YOLO `data.yaml`
     data_yaml = {
-        "train": images_dir,
-        "val": images_dir,
+        "train": os.path.abspath(images_dir),
+        "val": os.path.abspath(images_dir),
         "nc": 1,
         "names": ["sign"]
     }
-    with open(os.path.join(data_dir, "data.yaml"), "w") as f:
+    yaml_path = os.path.join(base_dir, "data.yaml")
+    with open(yaml_path, "w") as f:
         yaml.dump(data_yaml, f)
     
     # Train YOLO model
     yolo_model = YOLO("yolov8n.pt")
-    yolo_model.train(data=os.path.join(data_dir, "data.yaml"), epochs=10, imgsz=640)
+    yolo_model.train(data=yaml_path, epochs=10, imgsz=640)
     return "runs/train/exp/weights/best.pt"
 
 # Streamlit App
