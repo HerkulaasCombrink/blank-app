@@ -54,55 +54,13 @@ def extract_roi(image):
         return roi_resized
     return None
 
-# Train model with progress bar using automatically detected ROIs
-def train_model(uploaded_files):
-    images, labels = [], []
-    label_map = {}
-    
-    for uploaded_file in uploaded_files:
-        label = uploaded_file.name.split('_')[0]  # Assuming label is in filename
-        if label not in label_map:
-            label_map[label] = len(label_map)
-        
-        image = np.array(Image.open(uploaded_file).convert('RGB'))
-        roi = extract_roi(image)
-        if roi is not None:
-            images.append(roi)
-            labels.append(label_map[label])
-    
-    if not images:
-        st.error("No valid bounding boxes detected in the images.")
-        return None, None
-    
-    images = np.array(images)
-    labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
-    
-    model = create_model(num_classes=len(label_map))
-    
-    progress_bar = st.progress(0)
-    class TrainingCallback(tf.keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            progress_bar.progress((epoch + 1) / 10)
-    
-    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2, callbacks=[TrainingCallback()])
-    return model, label_map
-
-# Save trained model
-def save_model(model, label_map, filename='sign_model.pkl'):
-    with open(filename, 'wb') as f:
-        pickle.dump((model, label_map), f)
-    return filename
-
-# Load trained model
-def load_model(filename):
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
-
 # Process video and detect signs using automatically detected bounding boxes
 def process_video(video_file, model, label_map):
     cap = cv2.VideoCapture(video_file)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     detected_signs = []
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    progress_bar = st.progress(0)
     
     frame_count = 0
     while cap.isOpened():
@@ -115,10 +73,17 @@ def process_video(video_file, model, label_map):
             if roi is not None:
                 frame_array = np.expand_dims(roi, axis=0)
                 prediction = model.predict(frame_array)
-                predicted_label = list(label_map.keys())[np.argmax(prediction)]
+                predicted_index = np.argmax(prediction)
+                
+                if prediction[0][predicted_index] >= 0.7:  # Confidence threshold
+                    predicted_label = list(label_map.keys())[predicted_index]
+                else:
+                    predicted_label = "Not Detected"
+                
                 detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
         
         frame_count += 1
+        progress_bar.progress(frame_count / total_frames)
     
     cap.release()
     return pd.DataFrame(detected_signs)
