@@ -26,6 +26,17 @@ def create_model(num_classes):
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
+# Function to save model
+def save_model(model, label_map, filename='sign_model.pkl'):
+    with open(filename, 'wb') as f:
+        pickle.dump((model, label_map), f)
+    return filename
+
+# Function to load model
+def load_model(filename):
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
+
 # Automatically detect red bounding boxes
 def detect_red_bounding_box(image):
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
@@ -90,19 +101,9 @@ def process_video(video_file, model, label_map):
 
 # Streamlit app
 st.title("Sign Language Recognition")
-option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Process Video"])
+option = st.radio("Choose an action:", ["Upload Pickle File and Process Video"])
 
-if option == "Train Model":
-    uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
-    if st.button("Train Model") and uploaded_files:
-        model, label_map = train_model(uploaded_files)
-        if model:
-            model_filename = save_model(model, label_map)
-            st.success("Model trained and saved successfully!")
-            with open(model_filename, "rb") as f:
-                st.download_button("Download Model", f, file_name=model_filename)
-
-elif option == "Upload Pickle File and Process Video":
+if option == "Upload Pickle File and Process Video":
     uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
     uploaded_video = st.file_uploader("Upload Video File", type=["mp4"])
     
