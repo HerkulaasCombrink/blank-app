@@ -35,8 +35,7 @@ def draw_bounding_boxes(image, face_coords, hand_coords):
     return overlay
 
 # Process images with adjustable number of synthetic samples
-def generate_synthetic_images(uploaded_file, face_coords, hand_coords, num_images):
-    image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
+def generate_synthetic_images(image, face_coords, hand_coords, num_images):
     synthetic_images = [augment_image(image) for _ in range(num_images)]
     labeled_images = [draw_bounding_boxes(img, face_coords, hand_coords) for img in synthetic_images]
     return labeled_images
@@ -56,23 +55,29 @@ st.title("Synthetic Data Generator for Sign Language")
 uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg"])
 num_images = st.slider("Number of Synthetic Images", min_value=1, max_value=20, value=10)
 
-# Interactive bounding box selection
-st.write("**Select Face and Hand Bounding Boxes**")
-face_x1 = st.slider("Face X1", 0, 100, 30)
-face_y1 = st.slider("Face Y1", 0, 100, 30)
-face_x2 = st.slider("Face X2", 0, 100, 70)
-face_y2 = st.slider("Face Y2", 0, 100, 70)
-hand_x1 = st.slider("Hand X1", 0, 100, 30)
-hand_y1 = st.slider("Hand Y1", 0, 100, 80)
-hand_x2 = st.slider("Hand X2", 0, 100, 70)
-hand_y2 = st.slider("Hand Y2", 0, 100, 95)
-
 if uploaded_file:
-    st.image(uploaded_file, caption="Original Image", use_column_width=True)
+    image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
+    st.image(image, caption="Original Image", use_column_width=True)
+    
+    # Interactive bounding box selection
+    st.write("**Adjust Face and Hand Bounding Boxes**")
+    face_x1 = st.slider("Face X1", 0, image.shape[1], int(image.shape[1] * 0.3))
+    face_y1 = st.slider("Face Y1", 0, image.shape[0], int(image.shape[0] * 0.2))
+    face_x2 = st.slider("Face X2", 0, image.shape[1], int(image.shape[1] * 0.7))
+    face_y2 = st.slider("Face Y2", 0, image.shape[0], int(image.shape[0] * 0.5))
+    hand_x1 = st.slider("Hand X1", 0, image.shape[1], int(image.shape[1] * 0.3))
+    hand_y1 = st.slider("Hand Y1", 0, image.shape[0], int(image.shape[0] * 0.6))
+    hand_x2 = st.slider("Hand X2", 0, image.shape[1], int(image.shape[1] * 0.7))
+    hand_y2 = st.slider("Hand Y2", 0, image.shape[0], int(image.shape[0] * 0.9))
+    
+    # Preview bounding boxes on the original image
+    face_coords = (face_x1, face_y1, face_x2, face_y2)
+    hand_coords = (hand_x1, hand_y1, hand_x2, hand_y2)
+    preview_image = draw_bounding_boxes(image, face_coords, hand_coords)
+    st.image(preview_image, caption="Preview Bounding Boxes", use_column_width=True)
+    
     if st.button("Generate Synthetic Images"):
-        face_coords = (int(face_x1 * 3), int(face_y1 * 3), int(face_x2 * 3), int(face_y2 * 3))
-        hand_coords = (int(hand_x1 * 3), int(hand_y1 * 3), int(hand_x2 * 3), int(hand_y2 * 3))
-        synthetic_images = generate_synthetic_images(uploaded_file, face_coords, hand_coords, num_images)
+        synthetic_images = generate_synthetic_images(image, face_coords, hand_coords, num_images)
         
         image_files = []
         metadata = {"images": []}
