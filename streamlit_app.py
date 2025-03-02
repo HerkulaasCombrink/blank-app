@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import time
 import imageio
 import io
+from PIL import Image
 
 # File path for the generated GIF
 gif_path = "hello_sign.gif"
@@ -43,14 +44,15 @@ def create_hand(angle):
     )
     return fig
 
-# Generate a GIF of the animation
+# Generate a GIF of the animation without using Kaleido
 def generate_gif():
     frames = []
     for i in range(20):  # Animate the waving motion
         angle = 0.3 * np.sin(i * np.pi / 5)
         fig = create_hand(angle)
-        img_bytes = fig.to_image(format="png")  # Convert Plotly figure to PNG
-        img = imageio.imread(io.BytesIO(img_bytes))  # Read image from bytes
+        img_buffer = io.BytesIO()
+        fig.write_html(img_buffer)
+        img = Image.open(img_buffer)
         frames.append(img)
     imageio.mimsave(gif_path, frames, duration=0.1)
 
