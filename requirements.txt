@@ -1,10 +1,6 @@
 streamlit
-numpy
-plotly
-matplotlib
-imageio
-Pillow
-tensorflow
-mediapipe
 opencv-python-headless
+numpy
+albumentations
+moviepy
 
