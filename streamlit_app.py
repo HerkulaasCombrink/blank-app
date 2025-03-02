@@ -6,7 +6,7 @@ import pickle
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
-from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array
+from tensorflow.keras.preprocessing.image import img_to_array
 from io import BytesIO
 from PIL import Image
 
@@ -25,7 +25,7 @@ def create_model(num_classes):
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
-# Train model
+# Train model with progress bar
 def train_model(uploaded_files):
     images, labels = [], []
     label_map = {}
@@ -45,7 +45,13 @@ def train_model(uploaded_files):
     labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
     
     model = create_model(num_classes=len(label_map))
-    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2)
+    
+    progress_bar = st.progress(0)
+    class TrainingCallback(tf.keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            progress_bar.progress((epoch + 1) / 10)
+    
+    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2, callbacks=[TrainingCallback()])
     return model, label_map
 
 # Save trained model
@@ -73,16 +79,22 @@ elif option == "Detect Sign Using Webcam":
     model, label_map = load_model()
     st.write("Webcam Stream (Press 'Start' to detect signs)")
     run = st.checkbox("Start Webcam")
-    cap = cv2.VideoCapture(0)
-
-    while run:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frame_resized = cv2.resize(frame, (64, 64))
-        frame_array = img_to_array(frame_resized) / 255.0
-        frame_array = np.expand_dims(frame_array, axis=0)
-        prediction = model.predict(frame_array)
-        predicted_label = list(label_map.keys())[np.argmax(prediction)]
-        st.image(frame, caption=f"Predicted Sign: {predicted_label}", channels="BGR")
-    cap.release()
+    
+    if run:
+        cap = cv2.VideoCapture(0)
+        stframe = st.empty()
+        while cap.isOpened() and run:
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to access webcam. Make sure it is connected and accessible.")
+                break
+            
+            frame_resized = cv2.resize(frame, (64, 64))
+            frame_array = img_to_array(frame_resized) / 255.0
+            frame_array = np.expand_dims(frame_array, axis=0)
+            prediction = model.predict(frame_array)
+            predicted_label = list(label_map.keys())[np.argmax(prediction)]
+            
+            cv2.putText(frame, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            stframe.image(frame, channels="BGR")
+        cap.release()
