@@ -7,9 +7,11 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array
+from io import BytesIO
+from PIL import Image
 
 # Define model architecture
-def create_model():
+def create_model(num_classes):
     model = Sequential([
         Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)),
         MaxPooling2D(pool_size=(2, 2)),
@@ -18,36 +20,38 @@ def create_model():
         Flatten(),
         Dense(128, activation='relu'),
         Dropout(0.5),
-        Dense(10, activation='softmax')  # Adjust output neurons based on classes
+        Dense(num_classes, activation='softmax')  # Output neurons match number of classes
     ])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
 # Train model
-def train_model(data_dir):
-    datagen = ImageDataGenerator(rescale=1./255, validation_split=0.2)
-    train_generator = datagen.flow_from_directory(
-        data_dir,
-        target_size=(64, 64),
-        batch_size=32,
-        class_mode='categorical',
-        subset='training'
-    )
-    val_generator = datagen.flow_from_directory(
-        data_dir,
-        target_size=(64, 64),
-        batch_size=32,
-        class_mode='categorical',
-        subset='validation'
-    )
-    model = create_model()
-    model.fit(train_generator, validation_data=val_generator, epochs=10)
-    return model
+def train_model(uploaded_files):
+    images, labels = [], []
+    label_map = {}
+    
+    for uploaded_file in uploaded_files:
+        label = uploaded_file.name.split('_')[0]  # Assuming label is in filename
+        if label not in label_map:
+            label_map[label] = len(label_map)
+        
+        image = Image.open(uploaded_file).convert('RGB')
+        image = image.resize((64, 64))
+        image_array = np.array(image) / 255.0
+        images.append(image_array)
+        labels.append(label_map[label])
+    
+    images = np.array(images)
+    labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
+    
+    model = create_model(num_classes=len(label_map))
+    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2)
+    return model, label_map
 
 # Save trained model
-def save_model(model, filename='sign_model.pkl'):
+def save_model(model, label_map, filename='sign_model.pkl'):
     with open(filename, 'wb') as f:
-        pickle.dump(model, f)
+        pickle.dump((model, label_map), f)
 
 # Load trained model
 def load_model(filename='sign_model.pkl'):
@@ -59,14 +63,14 @@ st.title("Sign Language Recognition")
 option = st.radio("Choose an action:", ["Train Model", "Detect Sign Using Webcam"])
 
 if option == "Train Model":
-    data_dir = st.text_input("Enter dataset folder path:")
-    if st.button("Train Model") and os.path.exists(data_dir):
-        model = train_model(data_dir)
-        save_model(model)
+    uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
+    if st.button("Train Model") and uploaded_files:
+        model, label_map = train_model(uploaded_files)
+        save_model(model, label_map)
         st.success("Model trained and saved successfully!")
 
 elif option == "Detect Sign Using Webcam":
-    model = load_model()
+    model, label_map = load_model()
     st.write("Webcam Stream (Press 'Start' to detect signs)")
     run = st.checkbox("Start Webcam")
     cap = cv2.VideoCapture(0)
@@ -79,6 +83,6 @@ elif option == "Detect Sign Using Webcam":
         frame_array = img_to_array(frame_resized) / 255.0
         frame_array = np.expand_dims(frame_array, axis=0)
         prediction = model.predict(frame_array)
-        predicted_label = np.argmax(prediction)
+        predicted_label = list(label_map.keys())[np.argmax(prediction)]
         st.image(frame, caption=f"Predicted Sign: {predicted_label}", channels="BGR")
     cap.release()
