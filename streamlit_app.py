@@ -58,43 +58,52 @@ def train_model(uploaded_files):
 def save_model(model, label_map, filename='sign_model.pkl'):
     with open(filename, 'wb') as f:
         pickle.dump((model, label_map), f)
+    return filename
 
 # Load trained model
-def load_model(filename='sign_model.pkl'):
+def load_model(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
 # Streamlit app
 st.title("Sign Language Recognition")
-option = st.radio("Choose an action:", ["Train Model", "Detect Sign Using Webcam"])
+option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Detect Sign Using Webcam"])
 
 if option == "Train Model":
     uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
     if st.button("Train Model") and uploaded_files:
         model, label_map = train_model(uploaded_files)
-        save_model(model, label_map)
+        model_filename = save_model(model, label_map)
         st.success("Model trained and saved successfully!")
+        with open(model_filename, "rb") as f:
+            st.download_button("Download Model", f, file_name=model_filename)
 
-elif option == "Detect Sign Using Webcam":
-    model, label_map = load_model()
-    st.write("Webcam Stream (Press 'Start' to detect signs)")
-    run = st.checkbox("Start Webcam")
-    
-    if run:
-        cap = cv2.VideoCapture(0)
-        stframe = st.empty()
-        while cap.isOpened() and run:
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to access webcam. Make sure it is connected and accessible.")
-                break
-            
-            frame_resized = cv2.resize(frame, (64, 64))
-            frame_array = img_to_array(frame_resized) / 255.0
-            frame_array = np.expand_dims(frame_array, axis=0)
-            prediction = model.predict(frame_array)
-            predicted_label = list(label_map.keys())[np.argmax(prediction)]
-            
-            cv2.putText(frame, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            stframe.image(frame, channels="BGR")
-        cap.release()
+elif option == "Upload Pickle File and Detect Sign Using Webcam":
+    uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
+    if uploaded_pkl:
+        with open("temp_model.pkl", "wb") as f:
+            f.write(uploaded_pkl.getbuffer())
+        model, label_map = load_model("temp_model.pkl")
+        st.success("Model loaded successfully!")
+        
+        st.write("Webcam Stream (Press 'Start' to detect signs)")
+        run = st.checkbox("Start Webcam")
+        
+        if run:
+            cap = cv2.VideoCapture(0)
+            stframe = st.empty()
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    st.error("Failed to access webcam. Make sure it is connected and accessible.")
+                    break
+                
+                frame_resized = cv2.resize(frame, (64, 64))
+                frame_array = img_to_array(frame_resized) / 255.0
+                frame_array = np.expand_dims(frame_array, axis=0)
+                prediction = model.predict(frame_array)
+                predicted_label = list(label_map.keys())[np.argmax(prediction)]
+                
+                cv2.putText(frame, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                stframe.image(frame, channels="BGR")
+            cap.release()
