@@ -32,6 +32,29 @@ def draw_bounding_boxes(image, bboxes):
         cv2.putText(overlay, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
     return overlay
 
+# Process images with bounding box tracking
+def generate_synthetic_images(image, bboxes, num_images):
+    synthetic_images = []
+    updated_bboxes = []
+    
+    for _ in range(num_images):
+        aug_img, aug_bboxes = augment_image_with_bboxes(image, bboxes)
+        synthetic_images.append(aug_img)
+        updated_bboxes.append(aug_bboxes)
+    
+    labeled_images = [draw_bounding_boxes(img, bboxes) for img, bboxes in zip(synthetic_images, updated_bboxes)]
+    return labeled_images, updated_bboxes
+
+# Create ZIP archive
+def create_zip(files, metadata, zip_name):
+    with zipfile.ZipFile(zip_name, 'w') as zipf:
+        for file in files:
+            zipf.write(file, os.path.basename(file))
+        metadata_path = "metadata.json"
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=4)
+        zipf.write(metadata_path, "metadata.json")
+
 # Streamlit UI
 st.title("Synthetic Data Generator for Sign Language")
 uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg"])
@@ -78,7 +101,7 @@ if uploaded_file:
     st.image(preview_image, caption="Updated Bounding Boxes", use_column_width=True)
     
     if st.button("Generate Synthetic Images"):
-        synthetic_images, updated_bboxes = generate_synthetic_images(image, *bboxes, num_images)
+        synthetic_images, updated_bboxes = generate_synthetic_images(image, bboxes, num_images)
         
         image_files = []
         metadata = {"images": []}
