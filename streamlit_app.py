@@ -17,11 +17,24 @@ def augment_image(image):
     augmented = augmentations(image=image)
     return augmented['image']
 
+# Overlay label on image
+def overlay_label(image, label):
+    overlay = image.copy()
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1
+    font_thickness = 2
+    text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+    text_x = (image.shape[1] - text_size[0]) // 2
+    text_y = image.shape[0] - 20
+    cv2.putText(overlay, label, (text_x, text_y), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
+    return overlay
+
 # Process images
 def generate_synthetic_images(uploaded_file, label):
     image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
     synthetic_images = [augment_image(image) for _ in range(10)]
-    return synthetic_images, label
+    labeled_images = [overlay_label(img, label) for img in synthetic_images]
+    return labeled_images, label
 
 # Create ZIP archive
 def create_zip(files, metadata, zip_name):
