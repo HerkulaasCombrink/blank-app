@@ -33,12 +33,6 @@ def overlay_label(image, label):
     cv2.putText(overlay, label, (text_x, text_y), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
     return overlay
 
-# Annotate synthetic images
-def annotate_image(image):
-    st.image(image, caption="Synthetic Image for Annotation", use_column_width=True)
-    annotation = st.text_input("Enter annotation for this image")
-    return annotation
-
 # Process images with adjustable number of synthetic samples
 def generate_synthetic_images(uploaded_file, label, num_images):
     image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
@@ -70,11 +64,10 @@ if uploaded_file and label:
         metadata = {"label": label, "images": []}
         
         for i, img in enumerate(synthetic_images):
-            annotation = annotate_image(img)
             img_path = f"synthetic_image_{i}.jpg"
             cv2.imwrite(img_path, img)
             image_files.append(img_path)
-            metadata["images"].append({"file": img_path, "label": label, "annotation": annotation})
+            metadata["images"].append({"file": img_path, "label": label})
             st.image(img, caption=f"Synthetic Image {i+1}", use_column_width=True)
         
         zip_name = "synthetic_images.zip"
