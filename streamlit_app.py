@@ -79,10 +79,11 @@ def augment_image(image):
     image = np.expand_dims(image, axis=0)
     return datagen.flow(image, batch_size=1)[0][0]
 
-# Process video and detect signs
+# Process video and detect signs every 20 milliseconds
 def process_video(video_file, model, label_map):
     cap = cv2.VideoCapture(video_file)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
+    frame_interval = max(1, int(fps * 0.02))  # Every 20 milliseconds
     detected_signs = []
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     progress_bar = st.progress(0)
@@ -93,7 +94,7 @@ def process_video(video_file, model, label_map):
         if not ret:
             break
         
-        if frame_count % fps == 0:  # Process 1 frame per second
+        if frame_count % frame_interval == 0:  # Process every 20ms frame
             roi = extract_roi(frame)
             if roi is not None:
                 frame_array = np.expand_dims(roi, axis=0)
@@ -106,9 +107,7 @@ def process_video(video_file, model, label_map):
                 else:
                     predicted_label = "Not Detected"
                 
-                detected_signs.append({"Second": frame_count // fps, "Detected Sign": predicted_label})
-        else:
-            detected_signs.append({"Second": frame_count // fps, "Detected Sign": "No Sign Detected"})
+                detected_signs.append({"Frame": frame_count, "Detected Sign": predicted_label})
         
         frame_count += 1
         progress_bar.progress(frame_count / total_frames)
