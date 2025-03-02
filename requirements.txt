@@ -6,3 +6,5 @@ imageio
 Pillow
 tensorflow
 mediapipe
+moviepy
+opencv-python-headless
