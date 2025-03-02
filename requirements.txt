@@ -1,5 +1,4 @@
 streamlit
 pandas
-manim
-pygame
-sys
+open3d
+numpy
