@@ -46,7 +46,7 @@ def train_model(uploaded_files):
         Dense(len(label_map), activation='softmax')
     ])
     
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='binary_crossentropy' if len(label_map) == 1 else 'categorical_crossentropy', metrics=['accuracy'])
     model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2)
     return model, label_map
 
