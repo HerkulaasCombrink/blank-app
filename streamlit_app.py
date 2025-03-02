@@ -37,6 +37,39 @@ def load_model(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
+# Train model
+def train_model(uploaded_files):
+    images, labels = [], []
+    label_map = {}
+    
+    for uploaded_file in uploaded_files:
+        label = uploaded_file.name.split('_')[0]  # Assuming label is in filename
+        if label not in label_map:
+            label_map[label] = len(label_map)
+        
+        image = np.array(Image.open(uploaded_file).convert('RGB'))
+        roi = extract_roi(image)
+        if roi is not None:
+            images.append(roi)
+            labels.append(label_map[label])
+    
+    if not images:
+        st.error("No valid bounding boxes detected in the images.")
+        return None, None
+    
+    images = np.array(images)
+    labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
+    
+    model = create_model(num_classes=len(label_map))
+    
+    progress_bar = st.progress(0)
+    class TrainingCallback(tf.keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            progress_bar.progress((epoch + 1) / 10)
+    
+    model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2, callbacks=[TrainingCallback()])
+    return model, label_map
+
 # Automatically detect red bounding boxes
 def detect_red_bounding_box(image):
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
@@ -101,9 +134,19 @@ def process_video(video_file, model, label_map):
 
 # Streamlit app
 st.title("Sign Language Recognition")
-option = st.radio("Choose an action:", ["Upload Pickle File and Process Video"])
+option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Process Video"])
 
-if option == "Upload Pickle File and Process Video":
+if option == "Train Model":
+    uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
+    if st.button("Train Model") and uploaded_files:
+        model, label_map = train_model(uploaded_files)
+        if model:
+            model_filename = save_model(model, label_map)
+            st.success("Model trained and saved successfully!")
+            with open(model_filename, "rb") as f:
+                st.download_button("Download Model", f, file_name=model_filename)
+
+elif option == "Upload Pickle File and Process Video":
     uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
     uploaded_video = st.file_uploader("Upload Video File", type=["mp4"])
     
