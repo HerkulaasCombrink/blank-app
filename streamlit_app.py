@@ -2,6 +2,10 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 import time
+import imageio
+
+# File path for the generated GIF
+gif_path = "hello_sign.gif"
 
 # Function to create a simple 3D hand using Plotly
 def create_hand(angle):
@@ -38,14 +42,22 @@ def create_hand(angle):
     )
     return fig
 
-# Streamlit UI
-st.title("SASL 3D Avatar - Signing 'Hello'")
-
-if st.button("Show 3D Hello Sign"):
+# Generate a GIF of the animation
+def generate_gif():
+    frames = []
     for i in range(20):  # Animate the waving motion
         angle = 0.3 * np.sin(i * np.pi / 5)
         fig = create_hand(angle)
-    
-    st.plotly_chart(fig)  # Show the final frame in one view
+        fig.write_image(f"frame_{i}.png")
+        frames.append(imageio.imread(f"frame_{i}.png"))
+    imageio.mimsave(gif_path, frames, duration=0.1)
+
+# Streamlit UI
+st.title("SASL 3D Avatar - Signing 'Hello'")
+
+if st.button("Generate & Show GIF"):
+    generate_gif()
+    st.image(gif_path)
+    st.download_button(label="Download GIF", data=open(gif_path, "rb").read(), file_name="hello_sign.gif", mime="image/gif")
 
 st.write("This 3D avatar represents a waving hand for the 'Hello' sign.")
