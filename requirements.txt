@@ -5,4 +5,6 @@ matplotlib
 imageio
 Pillow
 tensorflow
-mediapipe>=0.10.0
+mediapipe
+opencv-python-headless
+
