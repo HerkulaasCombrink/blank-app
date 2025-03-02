@@ -1,3 +1,5 @@
+import streamlit as st
+
 st.markdown(
     """
     **Scale-Free Network Disease Spread Simulation**
