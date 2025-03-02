@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import os
 
 # Sample dictionary mapping words to SASL sign images or videos (update paths as needed)
@@ -33,7 +32,7 @@ if st.button("Translate"):
             st.subheader("SASL Translation:")
             for word, sign_path in found_signs:
                 st.write(f"**{word.capitalize()}**")
-                st.image(sign_path, use_column_width=True)
+                st.image(sign_path, use_container_width=True)  # Updated parameter
         else:
             st.warning("No matching SASL signs found. Try a different input.")
     else:
