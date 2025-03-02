@@ -64,16 +64,21 @@ if uploaded_file:
     image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
     st.image(image, caption="Original Image", use_column_width=True)
     
-    # Interactive bounding box selection
-    st.write("**Adjust Face and Hand Bounding Boxes**")
-    face_x1 = st.slider("Face X1", 0, image.shape[1], int(image.shape[1] * 0.3))
-    face_y1 = st.slider("Face Y1", 0, image.shape[0], int(image.shape[0] * 0.2))
-    face_x2 = st.slider("Face X2", 0, image.shape[1], int(image.shape[1] * 0.7))
-    face_y2 = st.slider("Face Y2", 0, image.shape[0], int(image.shape[0] * 0.5))
-    hand_x1 = st.slider("Hand X1", 0, image.shape[1], int(image.shape[1] * 0.3))
-    hand_y1 = st.slider("Hand Y1", 0, image.shape[0], int(image.shape[0] * 0.6))
-    hand_x2 = st.slider("Hand X2", 0, image.shape[1], int(image.shape[1] * 0.7))
-    hand_y2 = st.slider("Hand Y2", 0, image.shape[0], int(image.shape[0] * 0.9))
+    # Layout adjustment: Face controls on the right, Hand controls on the left
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("**Adjust Hand Bounding Box**")
+        hand_x1 = st.slider("Hand X1", 0, image.shape[1], int(image.shape[1] * 0.3))
+        hand_y1 = st.slider("Hand Y1", 0, image.shape[0], int(image.shape[0] * 0.6))
+        hand_x2 = st.slider("Hand X2", 0, image.shape[1], int(image.shape[1] * 0.7))
+        hand_y2 = st.slider("Hand Y2", 0, image.shape[0], int(image.shape[0] * 0.9))
+    
+    with col2:
+        st.write("**Adjust Face Bounding Box**")
+        face_x1 = st.slider("Face X1", 0, image.shape[1], int(image.shape[1] * 0.3))
+        face_y1 = st.slider("Face Y1", 0, image.shape[0], int(image.shape[0] * 0.2))
+        face_x2 = st.slider("Face X2", 0, image.shape[1], int(image.shape[1] * 0.7))
+        face_y2 = st.slider("Face Y2", 0, image.shape[0], int(image.shape[0] * 0.5))
     
     # Preview bounding boxes on the original image
     face_coords = (face_x1, face_y1, face_x2, face_y2)
