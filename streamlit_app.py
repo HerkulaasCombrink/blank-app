@@ -113,3 +113,45 @@ def train_model(uploaded_files):
     
     model.fit(images, labels, epochs=10, batch_size=8, validation_split=0.2, callbacks=[TrainingCallback()])
     return model, label_map
+
+# Streamlit App
+def main():
+    st.title("Sign Language Recognition App")
+    option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Process Video"])
+    
+    if option == "Train Model":
+        uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
+        if st.button("Train Model") and uploaded_files:
+            model, label_map = train_model(uploaded_files)
+            if model:
+                model_filename = save_model(model, label_map)
+                st.success("Model trained and saved successfully!")
+                with open(model_filename, "rb") as f:
+                    st.download_button("Download Model", f, file_name=model_filename)
+    
+    elif option == "Upload Pickle File and Process Video":
+        uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
+        uploaded_video = st.file_uploader("Upload Video File", type=["mp4"])
+        
+        if uploaded_pkl and uploaded_video:
+            with open("temp_model.pkl", "wb") as f:
+                f.write(uploaded_pkl.getbuffer())
+            model, label_map = load_model("temp_model.pkl")
+            st.success("Model loaded successfully!")
+            
+            if st.button("Process Video"):
+                with open("temp_video.mp4", "wb") as f:
+                    f.write(uploaded_video.getbuffer())
+                
+                st.success("Video uploaded successfully! Processing...")
+                results_df = process_video("temp_video.mp4", model, label_map)
+                
+                st.write("Detected Signs in Video:")
+                st.dataframe(results_df)
+                
+                csv_filename = "detected_signs.csv"
+                results_df.to_csv(csv_filename, index=False)
+                st.download_button("Download CSV", data=open(csv_filename, "rb").read(), file_name=csv_filename)
+
+if __name__ == "__main__":
+    main()
