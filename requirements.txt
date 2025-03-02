@@ -4,3 +4,4 @@ psutil
 plotly
 matplotlib
 numpy
+cv2
