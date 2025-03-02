@@ -42,13 +42,13 @@ def create_hand(angle):
     )
     return fig
 
-# Generate a GIF of the animation without using Kaleido
+# Generate a GIF of the animation without using Kaleido or Orca
 def generate_gif():
     frames = []
     for i in range(20):  # Animate the waving motion
         angle = 0.3 * np.sin(i * np.pi / 5)
         fig = create_hand(angle)
-        img_bytes = fig.to_image(format="png", engine="orca")
+        img_bytes = fig.to_image(format="png")
         img = Image.open(io.BytesIO(img_bytes))
         frames.append(img)
     
