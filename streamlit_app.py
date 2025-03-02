@@ -5,40 +5,45 @@ import cv2
 import numpy as np
 import tempfile
 import json
-from albumentations import Compose, RandomBrightnessContrast, ShiftScaleRotate, Blur, ElasticTransform, GridDistortion, OpticalDistortion, HueSaturationValue
+from albumentations import Compose, RandomBrightnessContrast, ShiftScaleRotate, Blur, ElasticTransform, GridDistortion, OpticalDistortion, HueSaturationValue, BboxParams
 
-# Define augmentation pipeline for diverse transformations with color and face distortions
-def augment_image(image):
+# Define augmentation pipeline with bounding box support
+def augment_image_with_bboxes(image, bboxes):
     augmentations = Compose([
         RandomBrightnessContrast(p=0.5),
-        ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.9),
+        ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.9, border_mode=cv2.BORDER_CONSTANT),
         Blur(blur_limit=5, p=0.5),
         ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.7),
         GridDistortion(num_steps=5, distort_limit=0.3, p=0.6),
         OpticalDistortion(distort_limit=0.3, shift_limit=0.3, p=0.6),
         HueSaturationValue(hue_shift_limit=30, sat_shift_limit=50, val_shift_limit=50, p=0.7)  # Color variation
-    ])
-    augmented = augmentations(image=image)
-    return augmented['image']
+    ], bbox_params=BboxParams(format='pascal_voc', label_fields=['category']))
+    augmented = augmentations(image=image, bboxes=bboxes, category=["face", "hand"])
+    return augmented['image'], augmented['bboxes']
 
-# Draw bounding boxes on image for hand and face
-def draw_bounding_boxes(image, face_coords, hand_coords):
+# Draw bounding boxes on image
+def draw_bounding_boxes(image, bboxes):
     overlay = image.copy()
-    if face_coords:
-        x1, y1, x2, y2 = face_coords
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 255), 2)
-        cv2.putText(overlay, "Face", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-    if hand_coords:
-        x1, y1, x2, y2 = hand_coords
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        cv2.putText(overlay, "Hand", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+    for bbox, label in zip(bboxes, ["Face", "Hand"]):
+        x1, y1, x2, y2 = map(int, bbox)
+        color = (0, 0, 255) if label == "Face" else (255, 0, 0)
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(overlay, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
     return overlay
 
-# Process images with adjustable number of synthetic samples
+# Process images with bounding box tracking
 def generate_synthetic_images(image, face_coords, hand_coords, num_images):
-    synthetic_images = [augment_image(image) for _ in range(num_images)]
-    labeled_images = [draw_bounding_boxes(img, face_coords, hand_coords) for img in synthetic_images]
-    return labeled_images
+    bboxes = [face_coords, hand_coords]
+    synthetic_images = []
+    updated_bboxes = []
+    
+    for _ in range(num_images):
+        aug_img, aug_bboxes = augment_image_with_bboxes(image, bboxes)
+        synthetic_images.append(aug_img)
+        updated_bboxes.append(aug_bboxes)
+    
+    labeled_images = [draw_bounding_boxes(img, bboxes) for img, bboxes in zip(synthetic_images, updated_bboxes)]
+    return labeled_images, updated_bboxes
 
 # Create ZIP archive
 def create_zip(files, metadata, zip_name):
@@ -73,20 +78,20 @@ if uploaded_file:
     # Preview bounding boxes on the original image
     face_coords = (face_x1, face_y1, face_x2, face_y2)
     hand_coords = (hand_x1, hand_y1, hand_x2, hand_y2)
-    preview_image = draw_bounding_boxes(image, face_coords, hand_coords)
+    preview_image = draw_bounding_boxes(image, [face_coords, hand_coords])
     st.image(preview_image, caption="Preview Bounding Boxes", use_column_width=True)
     
     if st.button("Generate Synthetic Images"):
-        synthetic_images = generate_synthetic_images(image, face_coords, hand_coords, num_images)
+        synthetic_images, updated_bboxes = generate_synthetic_images(image, face_coords, hand_coords, num_images)
         
         image_files = []
         metadata = {"images": []}
         
-        for i, img in enumerate(synthetic_images):
+        for i, (img, bboxes) in enumerate(zip(synthetic_images, updated_bboxes)):
             img_path = f"synthetic_image_{i}.jpg"
             cv2.imwrite(img_path, img)
             image_files.append(img_path)
-            metadata["images"].append({"file": img_path, "face_bbox": face_coords, "hand_bbox": hand_coords})
+            metadata["images"].append({"file": img_path, "face_bbox": bboxes[0], "hand_bbox": bboxes[1]})
             st.image(img, caption=f"Synthetic Image {i+1}", use_column_width=True)
         
         zip_name = "synthetic_images.zip"
