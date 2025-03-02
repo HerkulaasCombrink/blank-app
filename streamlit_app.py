@@ -1,34 +1,57 @@
-from manim import *
 import streamlit as st
-import os
+import pygame
+import sys
 
-temp_video_path = "hello_sign.mp4"
+# Initialize pygame
+pygame.init()
 
-def create_hello_animation():
-    class HelloSign(Scene):
-        def construct(self):
-            # Create a waving hand using circles and rectangles
-            hand = SVGMobject("hand.svg").scale(1.5).set_color(YELLOW)
-            hand.move_to(RIGHT * 2)
-            
-            text = Text("Hello!").scale(1.5).move_to(UP * 2.5)
-            
-            # Create a waving motion
-            self.play(Write(text))
-            for _ in range(3):
-                self.play(hand.animate.rotate(PI / 6), run_time=0.3)
-                self.play(hand.animate.rotate(-PI / 6), run_time=0.3)
-            
-            self.wait(1)
-    
-    HelloSign().render(file_name=temp_video_path)
+# Define screen dimensions
+WIDTH, HEIGHT = 400, 400
 
-# Check if the animation exists, otherwise generate it
-if not os.path.exists(temp_video_path):
-    create_hello_animation()
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+YELLOW = (255, 204, 0)
+
+# Initialize screen
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("SASL Avatar - Hello")
+
+# Hand representation (a simple rectangle waving)
+hand = pygame.Rect(WIDTH // 2 - 25, HEIGHT // 2, 50, 80)
+wave_up = False  # Track wave direction
+
+# Function to animate hand waving
+def animate_hand():
+    global wave_up
+    if wave_up:
+        hand.y += 10  # Move hand down
+    else:
+        hand.y -= 10  # Move hand up
+
+    if hand.y <= HEIGHT // 2 - 20:
+        wave_up = True
+    elif hand.y >= HEIGHT // 2 + 20:
+        wave_up = False
 
 # Streamlit UI
-st.title("SASL Avatar: Signing Hello")
+st.title("South African Sign Language (SASL) - Avatar Signing 'Hello'")
 
-if st.button("Show 'Hello' Sign Animation"):
-    st.video(temp_video_path)
+if st.button("Start Animation"):
+    running = True
+    while running:
+        screen.fill(WHITE)  # Background
+        pygame.draw.rect(screen, YELLOW, hand)  # Draw hand
+
+        animate_hand()  # Move hand
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                pygame.quit()
+                sys.exit()
+
+        pygame.display.flip()  # Update screen
+        pygame.time.delay(200)  # Slow down animation
+
+st.write("Click the button to see a waving hand sign for 'Hello'!")
