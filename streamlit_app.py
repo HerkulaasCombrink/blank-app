@@ -5,9 +5,7 @@ import time
 import imageio
 import io
 from PIL import Image
-
-# File path for the generated GIF
-gif_path = "hello_sign.gif"
+import tempfile
 
 # Function to create a simple 3D hand using Plotly
 def create_hand(angle):
@@ -50,17 +48,19 @@ def generate_gif():
     for i in range(20):  # Animate the waving motion
         angle = 0.3 * np.sin(i * np.pi / 5)
         fig = create_hand(angle)
-        img_buffer = io.BytesIO()
-        fig.write_html(img_buffer)
-        img = Image.open(img_buffer)
+        img_bytes = fig.to_image(format="png", engine="orca")
+        img = Image.open(io.BytesIO(img_bytes))
         frames.append(img)
-    imageio.mimsave(gif_path, frames, duration=0.1)
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as tmpfile:
+        imageio.mimsave(tmpfile.name, frames, duration=0.1)
+        return tmpfile.name
 
 # Streamlit UI
 st.title("SASL 3D Avatar - Signing 'Hello'")
 
 if st.button("Generate & Show GIF"):
-    generate_gif()
+    gif_path = generate_gif()
     st.image(gif_path)
     st.download_button(label="Download GIF", data=open(gif_path, "rb").read(), file_name="hello_sign.gif", mime="image/gif")
 
