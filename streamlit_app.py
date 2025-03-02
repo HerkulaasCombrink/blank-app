@@ -1,57 +1,52 @@
 import streamlit as st
-import pygame
-import sys
+import streamlit.components.v1 as components
 
-# Initialize pygame
-pygame.init()
+# HTML & JavaScript for a 3D Hand Animation using Three.js
+threejs_code = """
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+        // Create Scene
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        var renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-# Define screen dimensions
-WIDTH, HEIGHT = 400, 400
+        // Create Hand (Simple Cube for demo)
+        var geometry = new THREE.BoxGeometry(1, 2, 0.5);
+        var material = new THREE.MeshBasicMaterial({color: 0xffcc00});
+        var hand = new THREE.Mesh(geometry, material);
+        scene.add(hand);
 
-# Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-YELLOW = (255, 204, 0)
+        camera.position.z = 5;
 
-# Initialize screen
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("SASL Avatar - Hello")
+        function animate() {
+            requestAnimationFrame(animate);
+            hand.rotation.x += 0.05;
+            hand.rotation.y += 0.05;
+            renderer.render(scene, camera);
+        }
 
-# Hand representation (a simple rectangle waving)
-hand = pygame.Rect(WIDTH // 2 - 25, HEIGHT // 2, 50, 80)
-wave_up = False  # Track wave direction
-
-# Function to animate hand waving
-def animate_hand():
-    global wave_up
-    if wave_up:
-        hand.y += 10  # Move hand down
-    else:
-        hand.y -= 10  # Move hand up
-
-    if hand.y <= HEIGHT // 2 - 20:
-        wave_up = True
-    elif hand.y >= HEIGHT // 2 + 20:
-        wave_up = False
+        animate();
+    </script>
+</body>
+</html>
+"""
 
 # Streamlit UI
-st.title("South African Sign Language (SASL) - Avatar Signing 'Hello'")
+st.title("South African Sign Language (SASL) - 3D Avatar Signing 'Hello'")
 
-if st.button("Start Animation"):
-    running = True
-    while running:
-        screen.fill(WHITE)  # Background
-        pygame.draw.rect(screen, YELLOW, hand)  # Draw hand
+# Embed Three.js animation inside Streamlit
+components.html(threejs_code, height=500)
 
-        animate_hand()  # Move hand
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-                pygame.quit()
-                sys.exit()
-
-        pygame.display.flip()  # Update screen
-        pygame.time.delay(200)  # Slow down animation
-
-st.write("Click the button to see a waving hand sign for 'Hello'!")
+st.write("This 3D avatar represents a waving hand as the 'Hello' sign.")
