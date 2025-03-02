@@ -90,7 +90,7 @@ elif option == "Upload Pickle File and Detect Sign Using Webcam":
         run = st.checkbox("Start Webcam")
         
         if run:
-            cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # Ensuring DirectShow backend is used
             stframe = st.empty()
             while cap.isOpened():
                 ret, frame = cap.read()
@@ -107,3 +107,4 @@ elif option == "Upload Pickle File and Detect Sign Using Webcam":
                 cv2.putText(frame, f"Predicted: {predicted_label}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 stframe.image(frame, channels="BGR")
             cap.release()
+            cv2.destroyAllWindows()
