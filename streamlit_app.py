@@ -9,7 +9,7 @@ import tempfile
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
-# Function to create a simple 3D hand using Plotly
+# Function to create a simple 3D hand using Matplotlib
 def create_hand(angle):
     palm_x = [-0.2, 0.2, 0.2, -0.2, -0.2]
     palm_y = [0, 0, 0.4, 0.4, 0]
@@ -41,7 +41,7 @@ def create_hand(angle):
     
     return fig
 
-# Generate a GIF of the animation using Matplotlib
+# Generate a looping GIF of the animation using Matplotlib
 def generate_gif():
     frames = []
     for i in range(20):  # Animate the waving motion
@@ -56,7 +56,7 @@ def generate_gif():
         plt.close(fig)
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as tmpfile:
-        imageio.mimsave(tmpfile.name, frames, duration=0.1)
+        imageio.mimsave(tmpfile.name, frames, duration=0.1, loop=0)  # Loop the GIF indefinitely
         return tmpfile.name
 
 # Streamlit UI
