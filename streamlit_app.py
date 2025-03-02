@@ -3,6 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 import time
 import imageio
+import io
 
 # File path for the generated GIF
 gif_path = "hello_sign.gif"
@@ -48,8 +49,9 @@ def generate_gif():
     for i in range(20):  # Animate the waving motion
         angle = 0.3 * np.sin(i * np.pi / 5)
         fig = create_hand(angle)
-        fig.write_image(f"frame_{i}.png")
-        frames.append(imageio.imread(f"frame_{i}.png"))
+        img_bytes = fig.to_image(format="png")  # Convert Plotly figure to PNG
+        img = imageio.imread(io.BytesIO(img_bytes))  # Read image from bytes
+        frames.append(img)
     imageio.mimsave(gif_path, frames, duration=0.1)
 
 # Streamlit UI
