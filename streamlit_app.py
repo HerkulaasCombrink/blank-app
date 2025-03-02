@@ -21,23 +21,20 @@ def augment_image(image):
     augmented = augmentations(image=image)
     return augmented['image']
 
-# Overlay label on image
-def overlay_label(image, label):
+# Draw bounding box on image
+def draw_bounding_box(image, label):
+    height, width, _ = image.shape
+    x1, y1, x2, y2 = int(width * 0.3), int(height * 0.3), int(width * 0.7), int(height * 0.7)
     overlay = image.copy()
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 1
-    font_thickness = 2
-    text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
-    text_x = (image.shape[1] - text_size[0]) // 2
-    text_y = image.shape[0] - 20
-    cv2.putText(overlay, label, (text_x, text_y), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
+    cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 255), 2)
+    cv2.putText(overlay, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
     return overlay
 
 # Process images with adjustable number of synthetic samples
 def generate_synthetic_images(uploaded_file, label, num_images):
     image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
     synthetic_images = [augment_image(image) for _ in range(num_images)]
-    labeled_images = [overlay_label(img, label) for img in synthetic_images]
+    labeled_images = [draw_bounding_box(img, label) for img in synthetic_images]
     return labeled_images, label
 
 # Create ZIP archive
@@ -67,7 +64,7 @@ if uploaded_file and label:
             img_path = f"synthetic_image_{i}.jpg"
             cv2.imwrite(img_path, img)
             image_files.append(img_path)
-            metadata["images"].append({"file": img_path, "label": label})
+            metadata["images"].append({"file": img_path, "label": label, "bbox": [0.3, 0.3, 0.7, 0.7]})
             st.image(img, caption=f"Synthetic Image {i+1}", use_column_width=True)
         
         zip_name = "synthetic_images.zip"
