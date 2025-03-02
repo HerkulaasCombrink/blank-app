@@ -110,6 +110,15 @@ if uploaded_file:
     if st.button("Generate Synthetic Images"):
         synthetic_images, updated_bboxes = generate_synthetic_images(image, bboxes, num_images)
         
+        image_files = []
+        metadata = {"images": []}
+        
+        for i, img in enumerate(synthetic_images):
+            img_path = f"synthetic_image_{i}.jpg"
+            cv2.imwrite(img_path, img)
+            image_files.append(img_path)
+            metadata["images"].append({"file": img_path, "bboxes": updated_bboxes[i]})
+        
         zip_name = "synthetic_images.zip"
-        create_zip([f"synthetic_image_{i}.jpg" for i in range(num_images)], {}, zip_name)
+        create_zip(image_files, metadata, zip_name)
         st.download_button("Download ZIP", data=open(zip_name, 'rb').read(), file_name=zip_name)
