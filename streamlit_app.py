@@ -4,6 +4,7 @@ import zipfile
 import cv2
 import numpy as np
 import tempfile
+import json
 from albumentations import Compose, RandomBrightnessContrast, ShiftScaleRotate, Blur
 
 # Define augmentation pipeline for images
@@ -17,72 +18,42 @@ def augment_image(image):
     return augmented['image']
 
 # Process images
-def generate_synthetic_images(uploaded_file):
+def generate_synthetic_images(uploaded_file, label):
     image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), cv2.IMREAD_COLOR)
     synthetic_images = [augment_image(image) for _ in range(10)]
-    return synthetic_images
-
-# Process videos using OpenCV instead of moviepy
-def generate_synthetic_videos(uploaded_file):
-    temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    temp_video.write(uploaded_file.read())
-    temp_video.close()
-    cap = cv2.VideoCapture(temp_video.name)
-    
-    output_files = []
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    
-    for i in range(10):
-        output_path = f"synthetic_video_{i}.mp4"
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-        
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            out.write(frame)
-        
-        out.release()
-        output_files.append(output_path)
-    
-    cap.release()
-    return output_files
+    return synthetic_images, label
 
 # Create ZIP archive
-def create_zip(files, zip_name):
+def create_zip(files, metadata, zip_name):
     with zipfile.ZipFile(zip_name, 'w') as zipf:
         for file in files:
             zipf.write(file, os.path.basename(file))
+        metadata_path = "metadata.json"
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=4)
+        zipf.write(metadata_path, "metadata.json")
 
 # Streamlit UI
 st.title("Synthetic Data Generator for Sign Language")
 option = st.radio("Choose Data Type", ("Image", "Video"))
 uploaded_file = st.file_uploader("Upload File", type=["jpg", "jpeg", "mp4"])
+label = st.text_input("Enter Label for the Data")
 
-if uploaded_file:
+if uploaded_file and label:
     if option == "Image":
         st.image(uploaded_file, caption="Original Image", use_column_width=True)
         if st.button("Generate Synthetic Images"):
-            synthetic_images = generate_synthetic_images(uploaded_file)
+            synthetic_images, label = generate_synthetic_images(uploaded_file, label)
             image_files = []
+            metadata = {"label": label, "images": []}
             
             for i, img in enumerate(synthetic_images):
                 img_path = f"synthetic_image_{i}.jpg"
                 cv2.imwrite(img_path, img)
                 image_files.append(img_path)
+                metadata["images"].append({"file": img_path, "label": label})
                 st.image(img, caption=f"Synthetic Image {i+1}", use_column_width=True)
             
             zip_name = "synthetic_images.zip"
-            create_zip(image_files, zip_name)
-            st.download_button("Download ZIP", data=open(zip_name, 'rb').read(), file_name=zip_name)
-
-    elif option == "Video":
-        st.video(uploaded_file)
-        if st.button("Generate Synthetic Videos"):
-            synthetic_videos = generate_synthetic_videos(uploaded_file)
-            zip_name = "synthetic_videos.zip"
-            create_zip(synthetic_videos, zip_name)
+            create_zip(image_files, metadata, zip_name)
             st.download_button("Download ZIP", data=open(zip_name, 'rb').read(), file_name=zip_name)
