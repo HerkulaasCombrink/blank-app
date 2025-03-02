@@ -1,8 +1,7 @@
 streamlit
 opencv-python-headless
 numpy
-tensorflow
+tensorflow==2.12.0
 pillow
 pickle-mixin
-protobuf
-pyqt5
+protobuf==3.20.*
