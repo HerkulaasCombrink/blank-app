@@ -5,85 +5,25 @@ import os
 import pickle
 import tensorflow as tf
 import pandas as pd
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
-from tensorflow.keras.preprocessing.image import img_to_array
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import load_model
 from io import BytesIO
 from PIL import Image
+import torch
+import torchvision.transforms as transforms
+from torchvision import models
 
-# Define model architecture
-def create_model(num_classes):
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)),
-        MaxPooling2D(pool_size=(2, 2)),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(pool_size=(2, 2)),
-        Flatten(),
-        Dense(128, activation='relu'),
-        Dropout(0.5),
-        Dense(num_classes, activation='softmax')  # Output neurons match number of classes
-    ])
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-    return model
+# Load YOLO model
+from ultralytics import YOLO
 
-# Function to save model
-def save_model(model, label_map, filename='sign_model.pkl'):
-    with open(filename, 'wb') as f:
-        pickle.dump((model, label_map), f)
-    return filename
+# Load pre-trained YOLO model for object detection
+def load_yolo_model(model_path):
+    return YOLO(model_path)
 
-# Function to load model
-def load_model(filename):
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
-
-# Improve red bounding box detection
-def detect_red_bounding_box(image):
-    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    lower_red1 = np.array([0, 150, 50])  # Adjusted threshold
-    upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([170, 150, 50])
-    upper_red2 = np.array([180, 255, 255])
-    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask = mask1 + mask2
-    
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:
-        largest_contour = max(contours, key=cv2.contourArea)
-        if cv2.contourArea(largest_contour) > 500:  # Ensure bounding box is valid
-            x, y, w, h = cv2.boundingRect(largest_contour)
-            return (x, y, x + w, y + h)
-    return None
-
-# Extract region of interest (ROI) from image
-def extract_roi(image):
-    bbox = detect_red_bounding_box(image)
-    if bbox:
-        x1, y1, x2, y2 = bbox
-        roi = image[y1:y2, x1:x2]
-        roi_resized = cv2.resize(roi, (64, 64)) / 255.0
-        return roi_resized
-    return None
-
-# Data augmentation for training images
-def augment_image(image):
-    datagen = ImageDataGenerator(
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        brightness_range=[0.8, 1.2],
-        horizontal_flip=True
-    )
-    image = np.expand_dims(image, axis=0)
-    return datagen.flow(image, batch_size=1)[0][0]
-
-# Process video and detect signs every 20 milliseconds
-def process_video(video_file, model, label_map):
+# Process video and detect trained sign patterns
+def process_video(video_file, model, label_map, yolo_model):
     cap = cv2.VideoCapture(video_file)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frame_interval = max(1, int(fps * 0.02))  # Every 20 milliseconds
+    frame_interval = 5  # Process every 5th frame
     detected_signs = []
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     progress_bar = st.progress(0)
@@ -94,20 +34,29 @@ def process_video(video_file, model, label_map):
         if not ret:
             break
         
-        if frame_count % frame_interval == 0:  # Process every 20ms frame
-            roi = extract_roi(frame)
-            if roi is not None:
-                frame_array = np.expand_dims(roi, axis=0)
+        if frame_count % frame_interval == 0:
+            # Run YOLO to detect potential sign areas
+            detections = yolo_model(frame)
+            
+            for detection in detections:
+                x1, y1, x2, y2, conf, cls = detection.xyxy[0].cpu().numpy()
+                if conf < 0.7:  # Ignore low-confidence detections
+                    continue
+                
+                roi = frame[int(y1):int(y2), int(x1):int(x2)]
+                roi_resized = cv2.resize(roi, (64, 64)) / 255.0
+                frame_array = np.expand_dims(roi_resized, axis=0)
+                
                 prediction = model.predict(frame_array)
                 predicted_index = np.argmax(prediction)
                 confidence = prediction[0][predicted_index]
                 
-                if confidence >= 0.85:  # Increased threshold
+                if confidence >= 0.7:
                     predicted_label = list(label_map.keys())[predicted_index]
                 else:
                     predicted_label = "Not Detected"
                 
-                detected_signs.append({"Frame": frame_count, "Detected Sign": predicted_label})
+                detected_signs.append({"Timestamp (s)": frame_count // fps, "Detected Sign": predicted_label, "Confidence": confidence})
         
         frame_count += 1
         progress_bar.progress(frame_count / total_frames)
@@ -118,34 +67,30 @@ def process_video(video_file, model, label_map):
 # Streamlit App
 def main():
     st.title("Sign Language Recognition App")
-    option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Process Video"])
+    option = st.radio("Choose an action:", ["Upload Pickle File and Process Video"])
     
-    if option == "Train Model":
-        uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
-        if st.button("Train Model") and uploaded_files:
-            model, label_map = train_model(uploaded_files)
-            if model:
-                model_filename = save_model(model, label_map)
-                st.success("Model trained and saved successfully!")
-                with open(model_filename, "rb") as f:
-                    st.download_button("Download Model", f, file_name=model_filename)
-    
-    elif option == "Upload Pickle File and Process Video":
+    if option == "Upload Pickle File and Process Video":
         uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
         uploaded_video = st.file_uploader("Upload Video File", type=["mp4"])
+        uploaded_yolo = st.file_uploader("Upload YOLO Model (Weights)", type=["pt"])
         
-        if uploaded_pkl and uploaded_video:
+        if uploaded_pkl and uploaded_video and uploaded_yolo:
             with open("temp_model.pkl", "wb") as f:
                 f.write(uploaded_pkl.getbuffer())
-            model, label_map = load_model("temp_model.pkl")
-            st.success("Model loaded successfully!")
+            model, label_map = pickle.load(open("temp_model.pkl", "rb"))
+            
+            with open("temp_yolo.pt", "wb") as f:
+                f.write(uploaded_yolo.getbuffer())
+            yolo_model = load_yolo_model("temp_yolo.pt")
+            
+            st.success("Models loaded successfully!")
             
             if st.button("Process Video"):
                 with open("temp_video.mp4", "wb") as f:
                     f.write(uploaded_video.getbuffer())
                 
                 st.success("Video uploaded successfully! Processing...")
-                results_df = process_video("temp_video.mp4", model, label_map)
+                results_df = process_video("temp_video.mp4", model, label_map, yolo_model)
                 
                 st.write("Detected Signs in Video:")
                 st.dataframe(results_df)
