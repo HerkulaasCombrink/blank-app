@@ -3,13 +3,13 @@ import pandas as pd
 
 def generate_annotation(h, c, n, variation, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2):
     math_annotation = (
-        f"S = ({h}, {c}, {n}) \times \left[ "
-        f"\frac{{{l2}^2}}{{{l1}_1}} \Bigg| "
-        f"\frac{{{s2}^2}}{{{s1}_1}} \Bigg| "
-        f"\frac{{{p2}^2}}{{{p1}_1}} \Bigg| "
-        f"\frac{{{m2}^2}}{{{m1}_1}} \Bigg| "
-        f"\frac{{{r2}^2}}{{{r1}_1}} "
-        f"\right]"
+        f"S = ({h}, {c}, {n}) \\times \\left[ "
+        f"\\frac{{{l2}^2}}{{{l1}_1}} \\Bigg| "
+        f"\\frac{{{s2}^2}}{{{s1}_1}} \\Bigg| "
+        f"\\frac{{{p2}^2}}{{{p1}_1}} \\Bigg| "
+        f"\\frac{{{m2}^2}}{{{m1}_1}} \\Bigg| "
+        f"\\frac{{{r2}^2}}{{{r1}_1}} "
+        f"\\right]"
     )
     
     csv_row = [variation, h, c, n, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2]
