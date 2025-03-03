@@ -3,19 +3,17 @@ import pandas as pd
 
 def generate_annotation(h, c, n, variation, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2):
     math_annotation = (
-        f"S = ({h}, {c}, {n}) \times \left[ "
-        f"\frac{{{l2}^2}}{{{l1}_1}} \Bigg| "
-        f"\frac{{{s2}^2}}{{{s1}_1}} \Bigg| "
-        f"\frac{{{p2}^2}}{{{p1}_1}} \Bigg| "
-        f"\frac{{{m2}^2}}{{{m1}_1}} \Bigg| "
-        f"\frac{{{r2}^2}}{{{r1}_1}} "
-        f"\right]"
+        f"S = (H, C, N) \\times \\left[ "
+        f"\\frac{{L^2}}{{L_1}} \\Bigg| "
+        f"\\frac{{S^2}}{{S_1}} \\Bigg| "
+        f"\\frac{{P^2}}{{P_1}} \\Bigg| "
+        f"\\frac{{M^2}}{{M_1}} \\Bigg| "
+        f"\\frac{{R^2}}{{R_1}} "
+        f"\\right]"
     )
     
     csv_row = [variation, h, c, n, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2]
-    csv_variation_sequence = [variation, h, c, n, "D_1", "L_1", "S_1", "P_1", "M_1", "R_1", "D^2", "L^2", "S^2", "P^2", "M^2", "R^2"]
-    csv_variation_numbers = [variation, h, c, n, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2]
-    return math_annotation, csv_row, csv_variation_sequence, csv_variation_numbers
+    return math_annotation, csv_row
 
 st.title("SASL Annotation Generator")
 
@@ -56,7 +54,7 @@ with col2:
 
 # Calculate button
 if st.button("Calculate Annotation"):
-    math_annotation, csv_row, csv_variation_sequence, csv_variation_numbers = generate_annotation(h, c, n, variation, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2)
+    math_annotation, csv_row = generate_annotation(h, c, n, variation, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2)
     
     # Display results
     st.subheader("Mathematical Notation")
@@ -66,5 +64,5 @@ if st.button("Calculate Annotation"):
     st.write(",".join(map(str, csv_row)))
     
     # Allow CSV Download
-    df = pd.DataFrame([csv_variation_sequence, csv_variation_numbers])
-    st.download_button("Download CSV", df.to_csv(index=False, header=False), "annotation.csv", "text/csv")
+    df = pd.DataFrame([csv_row], columns=["Variation", "H", "C", "N", "L1", "S1", "P1", "M1", "R1", "L2", "S2", "P2", "M2", "R2"])
+    st.download_button("Download CSV", df.to_csv(index=False), "annotation.csv", "text/csv")
