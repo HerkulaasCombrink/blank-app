@@ -3,12 +3,12 @@ import pandas as pd
 
 def generate_annotation(h, c, n, variation, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2):
     math_annotation = (
-        f"S = (H, C, N) \\times \\left[ "
-        f"\\frac{{L^2}}{{L_1}} \\Bigg| "
-        f"\\frac{{S^2}}{{S_1}} \\Bigg| "
-        f"\\frac{{P^2}}{{P_1}} \\Bigg| "
-        f"\\frac{{M^2}}{{M_1}} \\Bigg| "
-        f"\\frac{{R^2}}{{R_1}} "
+        f"S = ({h}, {c}, {n}) \\times \\left[ "
+        f"\\frac{{{l2}^2}}{{{l1}_1}} \\Bigg| "
+        f"\\frac{{{s2}^2}}{{{s1}_1}} \\Bigg| "
+        f"\\frac{{{p2}^2}}{{{p1}_1}} \\Bigg| "
+        f"\\frac{{{m2}^2}}{{{m1}_1}} \\Bigg| "
+        f"\\frac{{{r2}^2}}{{{r1}_1}} "
         f"\\right]"
     )
     
