@@ -3,14 +3,14 @@ import pandas as pd
 
 def generate_annotation(h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2):
     math_annotation = (
-        f"({h},{c},{n}) × [ "
-        f"{d2}/{d1} | "
-        f"{l2}/{l1} | "
-        f"{s2}/{s1} | "
-        f"{p2}/{p1} | "
-        f"{m2}/{m1} | "
-        f"{r2}/{r1} "
-        f"]"
+        f"({h},{c},{n}) \\times \\left[ "
+        f"\\frac{{{d2}}}{{{d1}}} \\Bigg| "
+        f"\\frac{{{l2}}}{{{l1}}} \\Bigg| "
+        f"\\frac{{{s2}}}{{{s1}}} \\Bigg| "
+        f"\\frac{{{p2}}}{{{p1}}} \\Bigg| "
+        f"\\frac{{{m2}}}{{{m1}}} \\Bigg| "
+        f"\\frac{{{r2}}}{{{r1}}} "
+        f"\\right]"
     )
     
     csv_row = [h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2]
