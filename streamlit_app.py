@@ -1,140 +1,55 @@
 import streamlit as st
-import cv2
-import numpy as np
-import os
-import pickle
-import tensorflow as tf
 import pandas as pd
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
-from io import BytesIO
-from PIL import Image
-import torch
-import yaml
-from ultralytics import YOLO
 
-# Load pre-trained YOLO model for object detection
-def load_yolo_model(model_path):
-    return YOLO(model_path)
+def generate_annotation(h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2):
+    math_annotation = (
+        f"({h},{c},{n}) × [ "
+        f"{d2}/{d1} | "
+        f"{l2}/{l1} | "
+        f"{s2}/{s1} | "
+        f"{p2}/{p1} | "
+        f"{m2}/{m1} | "
+        f"{r2}/{r1} "
+        f"]"
+    )
+    
+    csv_row = [h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2]
+    return math_annotation, csv_row
 
-# Train the classification model
-def train_model(uploaded_files):
-    progress_bar = st.progress(0)  # Add progress bar
-    images, labels = [], []
-    label_map = {}
-    
-    for uploaded_file in uploaded_files:
-        label = uploaded_file.name.split('_')[0]  # Extract label from filename
-        if label not in label_map:
-            label_map[label] = len(label_map)
-        
-        image = np.array(Image.open(uploaded_file).convert('RGB'))
-        image_resized = cv2.resize(image, (64, 64)) / 255.0
-        images.append(image_resized)
-        labels.append(label_map[label])
-    
-    images = np.array(images)
-    labels = tf.keras.utils.to_categorical(labels, num_classes=len(label_map))
-    
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)),
-        MaxPooling2D(pool_size=(2, 2)),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(pool_size=(2, 2)),
-        Flatten(),
-        Dense(128, activation='relu'),
-        Dropout(0.5),
-        Dense(len(label_map), activation='softmax')
-    ])
-    
-    model.compile(optimizer='adam', loss='binary_crossentropy' if len(label_map) == 1 else 'categorical_crossentropy', metrics=['accuracy'])
-    for epoch in range(10):
-        model.fit(images, labels, epochs=1, batch_size=8, validation_split=0.2, verbose=0)
-        progress_bar.progress((epoch + 1) / 10)  # Update progress bar
-    return model, label_map
+st.title("SASL Annotation Generator")
 
-# Train YOLO model on uploaded images
-def train_yolo(uploaded_files):
-    base_dir = "yolo_training_data"
-    images_dir = os.path.join(base_dir, "images")
-    labels_dir = os.path.join(base_dir, "labels")
-    os.makedirs(images_dir, exist_ok=True)
-    os.makedirs(labels_dir, exist_ok=True)
-    
-    # Ensure dataset structure
-    for uploaded_file in uploaded_files:
-        file_path = os.path.join(images_dir, uploaded_file.name)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        label_file = os.path.join(labels_dir, uploaded_file.name.replace(".jpg", ".txt").replace(".jpeg", ".txt"))
-        with open(label_file, "w") as f:
-            f.write("0 0.5 0.5 1.0 1.0\n")  # Placeholder for YOLO bounding box format
-    
-    # Create YOLO `data.yaml`
-    data_yaml = {
-        "train": os.path.abspath(images_dir),
-        "val": os.path.abspath(images_dir),
-        "nc": 1,
-        "names": ["sign"]
-    }
-    yaml_path = os.path.join(base_dir, "data.yaml")
-    with open(yaml_path, "w") as f:
-        yaml.dump(data_yaml, f)
-    
-    # Train YOLO model
-    yolo_model = YOLO("yolov8n.pt")
-    yolo_model.train(data=yaml_path, epochs=10, imgsz=640)
-    return "runs/train/exp/weights/best.pt"
+# Sidebar inputs
+st.sidebar.header("Global Features")
+h = st.sidebar.selectbox("Handedness (H)", [1, 2], index=0)
+c = st.sidebar.selectbox("Contact (C)", [0, 1], index=0)
+n = st.sidebar.selectbox("Mouthing (N)", [1, 2], index=0)
 
-# Streamlit App
-def main():
-    st.title("Sign Language Recognition App")
-    option = st.radio("Choose an action:", ["Train Model", "Upload Pickle File and Process Video"])
-    
-    if option == "Train Model":
-        uploaded_files = st.file_uploader("Upload Training Images", type=["jpg", "jpeg"], accept_multiple_files=True)
-        if st.button("Train Model") and uploaded_files:
-            model, label_map = train_model(uploaded_files)
-            yolo_weights = train_yolo(uploaded_files)
-            
-            model_filename = "sign_model.pkl"
-            with open(model_filename, "wb") as f:
-                pickle.dump((model, label_map), f)
-            
-            st.success("Model trained successfully! You can now download the trained models.")
-            st.download_button("Download Classification Model", open(model_filename, "rb"), file_name=model_filename)
-            st.download_button("Download YOLO Weights", open(yolo_weights, "rb"), file_name="sign_detector.pt")
-    
-    elif option == "Upload Pickle File and Process Video":
-        uploaded_pkl = st.file_uploader("Upload Trained Model (Pickle File)", type=["pkl"])
-        uploaded_video = st.file_uploader("Upload Video File", type=["mp4"])
-        uploaded_yolo = st.file_uploader("Upload YOLO Model (Weights)", type=["pt"])
-        
-        if uploaded_pkl and uploaded_video and uploaded_yolo:
-            with open("temp_model.pkl", "wb") as f:
-                f.write(uploaded_pkl.getbuffer())
-            model, label_map = pickle.load(open("temp_model.pkl", "rb"))
-            
-            with open("temp_yolo.pt", "wb") as f:
-                f.write(uploaded_yolo.getbuffer())
-            yolo_model = load_yolo_model("temp_yolo.pt")
-            
-            st.success("Models loaded successfully!")
-            
-            if st.button("Process Video"):
-                with open("temp_video.mp4", "wb") as f:
-                    f.write(uploaded_video.getbuffer())
-                
-                st.success("Video uploaded successfully! Processing...")
-                results_df = process_video("temp_video.mp4", model, label_map, yolo_model)
-                
-                st.write("Detected Signs in Video:")
-                st.dataframe(results_df)
-                
-                csv_filename = "detected_signs.csv"
-                results_df.to_csv(csv_filename, index=False)
-                st.download_button("Download CSV", data=open(csv_filename, "rb").read(), file_name=csv_filename)
+st.sidebar.header("Dominant Hand")
+d1 = 1  # Dominant hand always 1
+l1 = st.sidebar.selectbox("Location (L1)", list(range(11)), index=1)
+s1 = st.sidebar.text_input("Handshape (S1)", "B")
+p1 = st.sidebar.selectbox("Palm Orientation (P1)", list(range(1, 6)), index=0)
+m1 = st.sidebar.selectbox("Movement (M1)", list(range(24)), index=0)
+r1 = st.sidebar.selectbox("Repetition (R1)", [0, 1], index=0)
 
-if __name__ == "__main__":
-    main()
+st.sidebar.header("Non-Dominant Hand")
+d2 = st.sidebar.selectbox("Non-Dominant Hand (D2)", [0, 2], index=0)
+l2 = st.sidebar.selectbox("Location (L2)", list(range(11)), index=0)
+s2 = st.sidebar.text_input("Handshape (S2)", "0")
+p2 = st.sidebar.selectbox("Palm Orientation (P2)", list(range(6)), index=0)
+m2 = st.sidebar.selectbox("Movement (M2)", list(range(24)), index=0)
+r2 = st.sidebar.selectbox("Repetition (R2)", [0, 1], index=0)
+
+# Generate annotation and CSV output
+math_annotation, csv_row = generate_annotation(h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2)
+
+# Display results
+st.subheader("Mathematical Notation")
+st.latex(math_annotation)
+
+st.subheader("CSV Output")
+st.write(",".join(map(str, csv_row)))
+
+# Allow CSV Download
+df = pd.DataFrame([csv_row], columns=["H", "C", "N", "D1", "L1", "S1", "P1", "M1", "R1", "D2", "L2", "S2", "P2", "M2", "R2"])
+st.download_button("Download CSV", df.to_csv(index=False), "annotation.csv", "text/csv")
