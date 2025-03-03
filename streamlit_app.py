@@ -3,17 +3,17 @@ import pandas as pd
 
 def generate_annotation(h, c, n, variation, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2):
     math_annotation = (
-        f"S = ({h}, {c}, {n}) \\times \\left[ "
-        f"\\frac{{{l2}^2}}{{{l1}_1}} \\Bigg| "
-        f"\\frac{{{s2}^2}}{{{s1}_1}} \\Bigg| "
-        f"\\frac{{{p2}^2}}{{{p1}_1}} \\Bigg| "
-        f"\\frac{{{m2}^2}}{{{m1}_1}} \\Bigg| "
-        f"\\frac{{{r2}^2}}{{{r1}_1}} "
-        f"\\right]"
+        f"S = ({h}, {c}, {n}) \times \left[ "
+        f"\frac{{{l2}^2}}{{{l1}_1}} \Bigg| "
+        f"\frac{{{s2}^2}}{{{s1}_1}} \Bigg| "
+        f"\frac{{{p2}^2}}{{{p1}_1}} \Bigg| "
+        f"\frac{{{m2}^2}}{{{m1}_1}} \Bigg| "
+        f"\frac{{{r2}^2}}{{{r1}_1}} "
+        f"\right]"
     )
     
     csv_row = [variation, h, c, n, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2]
-    csv_variation_sequence = [variation, h, c, n, "D_1", "L_1", "S_1", "P_1", "M_1", "R_1", "D^2", "L^2", "S^2", "P^2", "M^2", "R^2"]
+    csv_variation_sequence = [variation, h, c, n, "L_1", "S_1", "P_1", "M_1", "R_1", "L^2", "S^2", "P^2", "M^2", "R^2"]
     csv_variation_numbers = [variation, h, c, n, l1, s1, p1, m1, r1, l2, s2, p2, m2, r2]
     return math_annotation, csv_row, csv_variation_sequence, csv_variation_numbers
 
