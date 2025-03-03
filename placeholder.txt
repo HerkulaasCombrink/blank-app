@@ -1,71 +1,55 @@
 import streamlit as st
-import numpy as np
-import plotly.graph_objects as go
-import time
-import imageio
-import io
-from PIL import Image
-import tempfile
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import pandas as pd
 
-# Function to create a simple 3D hand using Matplotlib
-def create_hand(angle):
-    palm_x = [-0.2, 0.2, 0.2, -0.2, -0.2]
-    palm_y = [0, 0, 0.4, 0.4, 0]
-    palm_z = [1, 1, 1, 1, 1]
-
-    fingers = [
-        ([-0.15, -0.15], [0.4, 0.6], [1, 1]),
-        ([-0.05, -0.05], [0.4, 0.7], [1, 1]),
-        ([0.05, 0.05], [0.4, 0.75], [1, 1]),
-        ([0.15, 0.15], [0.4, 0.65], [1, 1])
-    ]
+def generate_annotation(h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2):
+    math_annotation = (
+        f"({h},{c},{n}) × [ "
+        f"{d2}/{d1} | "
+        f"{l2}/{l1} | "
+        f"{s2}/{s1} | "
+        f"{p2}/{p1} | "
+        f"{m2}/{m1} | "
+        f"{r2}/{r1} "
+        f"]"
+    )
     
-    # Rotate hand slightly
-    rotated_y = np.cos(angle) * np.array(palm_y) - np.sin(angle) * np.array(palm_z)
-    rotated_z = np.sin(angle) * np.array(palm_y) + np.cos(angle) * np.array(palm_z)
-    
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw={'projection': '3d'})
-    ax.plot(palm_x, rotated_y, rotated_z, color='orange', linewidth=3)
-    
-    for finger in fingers:
-        finger_y = np.cos(angle) * np.array(finger[1]) - np.sin(angle) * np.array(finger[2])
-        finger_z = np.sin(angle) * np.array(finger[1]) + np.cos(angle) * np.array(finger[2])
-        ax.plot(finger[0], finger_y, finger_z, color='brown', linewidth=2)
-    
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_zticks([])
-    ax.set_title("SASL 'Hello' Sign")
-    
-    return fig
+    csv_row = [h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2]
+    return math_annotation, csv_row
 
-# Generate a looping GIF of the animation using Matplotlib
-def generate_gif():
-    frames = []
-    for i in range(20):  # Animate the waving motion
-        angle = 0.3 * np.sin(i * np.pi / 5)
-        fig = create_hand(angle)
-        
-        canvas = FigureCanvas(fig)
-        buf = io.BytesIO()
-        canvas.print_png(buf)
-        img = Image.open(buf)
-        frames.append(img)
-        plt.close(fig)
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as tmpfile:
-        imageio.mimsave(tmpfile.name, frames, duration=0.1, loop=0)  # Loop the GIF indefinitely
-        return tmpfile.name
+st.title("SASL Annotation Generator")
 
-# Streamlit UI
-st.title("SASL 3D Avatar - Signing 'Hello'")
+# Sidebar inputs
+st.sidebar.header("Global Features")
+h = st.sidebar.selectbox("Handedness (H)", [1, 2], index=0)
+c = st.sidebar.selectbox("Contact (C)", [0, 1], index=0)
+n = st.sidebar.selectbox("Mouthing (N)", [1, 2], index=0)
 
-if st.button("Generate & Show GIF"):
-    gif_path = generate_gif()
-    st.image(gif_path)
-    st.download_button(label="Download GIF", data=open(gif_path, "rb").read(), file_name="hello_sign.gif", mime="image/gif")
+st.sidebar.header("Dominant Hand")
+d1 = 1  # Dominant hand always 1
+l1 = st.sidebar.selectbox("Location (L1)", list(range(11)), index=1)
+s1 = st.sidebar.text_input("Handshape (S1)", "B")
+p1 = st.sidebar.selectbox("Palm Orientation (P1)", list(range(1, 6)), index=0)
+m1 = st.sidebar.selectbox("Movement (M1)", list(range(24)), index=0)
+r1 = st.sidebar.selectbox("Repetition (R1)", [0, 1], index=0)
 
-st.write("This 3D avatar represents a waving hand for the 'Hello' sign.")
+st.sidebar.header("Non-Dominant Hand")
+d2 = st.sidebar.selectbox("Non-Dominant Hand (D2)", [0, 2], index=0)
+l2 = st.sidebar.selectbox("Location (L2)", list(range(11)), index=0)
+s2 = st.sidebar.text_input("Handshape (S2)", "0")
+p2 = st.sidebar.selectbox("Palm Orientation (P2)", list(range(6)), index=0)
+m2 = st.sidebar.selectbox("Movement (M2)", list(range(24)), index=0)
+r2 = st.sidebar.selectbox("Repetition (R2)", [0, 1], index=0)
 
+# Generate annotation and CSV output
+math_annotation, csv_row = generate_annotation(h, c, n, d1, l1, s1, p1, m1, r1, d2, l2, s2, p2, m2, r2)
+
+# Display results
+st.subheader("Mathematical Notation")
+st.latex(math_annotation)
+
+st.subheader("CSV Output")
+st.write(",".join(map(str, csv_row)))
+
+# Allow CSV Download
+df = pd.DataFrame([csv_row], columns=["H", "C", "N", "D1", "L1", "S1", "P1", "M1", "R1", "D2", "L2", "S2", "P2", "M2", "R2"])
+st.download_button("Download CSV", df.to_csv(index=False), "annotation.csv", "text/csv")
